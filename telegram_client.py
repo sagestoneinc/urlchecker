@@ -164,12 +164,12 @@ class TelegramClient:
         flagged_urls = summary.malicious + summary.suspicious
         takedowns_requested = summary.malicious
         text = (
-            f"🛡️ <b>Malicious URL Checks — {report_date}</b>\n\n"
-            f"<b>Summary</b>\n"
+            f"🛡️ Malicious URL Checks — {report_date}\n\n"
+            f"Summary\n"
             f"- Sources Checked: {_escape(sources_checked)}\n"
-            f"- URLs Checked: <b>{summary.total}</b>\n"
-            f"- Flagged URLs: <b>{flagged_urls}</b>\n"
-            f"- Takedowns Requested: <b>{takedowns_requested}</b>"
+            f"- URLs Checked: {summary.total}\n"
+            f"- Flagged URLs: {flagged_urls}\n"
+            f"- Takedowns Requested: {takedowns_requested}"
         )
         logger.info("Sending run summary")
         return self._send(text)

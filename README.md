@@ -251,10 +251,10 @@ Alerts are sent **only when something changes** (no duplicate alerts):
 
 **Run summary:**
 ```
-Malicious URL Checks — 02/22/2026
+🛡️ Malicious URL Checks — 02/22/2026
 
 Summary
-- Sources Checked: Browser logs, spam reports, customer tickets
+- Sources Checked: VirusTotal
 - URLs Checked: 25
 - Flagged URLs: 3
 - Takedowns Requested: 1
