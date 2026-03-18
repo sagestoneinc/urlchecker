@@ -1,0 +1,89 @@
+name: Daily Malicious URL Checker
+
+on:
+  # Run automatically every day at 06:00 UTC
+  schedule:
+    - cron: "0 6 * * *"
+
+  # Allow manual trigger from the GitHub Actions UI
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Dry run (parse URLs but skip VirusTotal calls)"
+        required: false
+        default: "false"
+        type: choice
+        options:
+          - "false"
+          - "true"
+      debug:
+        description: "Enable debug logging"
+        required: false
+        default: "false"
+        type: choice
+        options:
+          - "false"
+          - "true"
+
+# Prevent overlapping scheduled runs
+concurrency:
+  group: url-checker
+  cancel-in-progress: false
+
+# Minimal required permissions for the GITHUB_TOKEN
+permissions:
+  contents: read
+
+jobs:
+  scan:
+    name: Scan URLs with VirusTotal
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install --upgrade pip && pip install -r requirements.txt
+
+      - name: Load .env for local runs (no-op on GitHub Actions)
+        run: |
+          if [ -f .env ]; then
+            echo "Note: .env file found – it will be used by python-dotenv."
+          fi
+
+      - name: Run URL scanner
+        env:
+          VT_API_KEY: ${{ secrets.VT_API_KEY }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          SEND_SUMMARY: "true"
+          RESULTS_DIR: results
+        run: |
+          EXTRA_FLAGS=""
+          if [ "${{ github.event.inputs.dry_run }}" = "true" ]; then
+            EXTRA_FLAGS="$EXTRA_FLAGS --dry-run"
+          fi
+          if [ "${{ github.event.inputs.debug }}" = "true" ]; then
+            EXTRA_FLAGS="$EXTRA_FLAGS --debug"
+          fi
+          python main.py --run-once --alert-summary $EXTRA_FLAGS
+
+      - name: Upload scan results as artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: url-scan-results-${{ github.run_number }}
+          path: |
+            results/latest_results.json
+            results/history.jsonl
+            results/latest_results.csv
+            results/run_summaries.jsonl
+          if-no-files-found: warn
+          retention-days: 90

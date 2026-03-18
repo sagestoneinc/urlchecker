@@ -1,0 +1,15 @@
+# urls.txt – one URL per line
+# Lines starting with # are treated as comments and are ignored.
+# Blank lines are also ignored.
+# You may include or omit the https:// scheme; it will be added automatically.
+
+# --- Example legitimate URLs ---
+https://www.google.com
+https://www.github.com
+https://www.cloudflare.com
+
+# --- Example suspicious/test URLs (safe for VirusTotal testing) ---
+# http://malware.wicar.org/data/ms14_064_ole_not_xp.html
+# http://www.eicar.org/download/eicar.com
+
+# --- Add your URLs below ---
