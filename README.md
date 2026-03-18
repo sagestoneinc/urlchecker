@@ -136,7 +136,7 @@ Edit `.github/workflows/daily-url-scan.yml`:
 ```yaml
 on:
   schedule:
-    - cron: "0 6 * * *"   # Every day at 06:00 UTC
+    - cron: "0 11 * * *"   # Every day at 06:00 EST (11:00 UTC)
 ```
 
 Common examples:
@@ -251,23 +251,27 @@ Alerts are sent **only when something changes** (no duplicate alerts):
 
 **Run summary:**
 ```
-📊 URL Scan Summary
+Malicious URL Checks — 02/22/2026
 
-🕐 Run at: 2024-01-15T06:30:00+00:00
-📋 Total URLs checked: 25
-
-🔴 Malicious: 1
-🟡 Suspicious: 2
-🟢 Clean: 21
-❓ Unknown: 0
-❌ Failed: 1
-
-🔔 Newly malicious: 1
-⚠️ Newly suspicious: 1
-📈 Worsened: 0
-📉 Improved: 0
-➡️ Unchanged: 22
+Summary
+- Sources Checked: Browser logs, spam reports, customer tickets
+- URLs Checked: 25
+- Flagged URLs: 3
+- Takedowns Requested: 1
 ```
+
+---
+
+## Bot commands (issue comments)
+
+You can run commands from an issue comment:
+
+- `/add-link https://example.com/path`  
+  Adds the URL to `urls.txt` (if missing) and queues a scan for that URL.
+- `/rescan https://example.com/path`  
+  Queues a scan for that URL without editing `urls.txt`.
+
+Both commands post a confirmation comment and dispatch the scanner workflow with a single-URL input.
 
 ---
 

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from datetime import datetime
 from typing import Optional
 
 import requests
@@ -147,22 +148,28 @@ class TelegramClient:
         logger.info("Sending domain alert for %s", dr.domain)
         return self._send(text)
 
-    def send_summary(self, summary: RunSummary) -> bool:
+    def send_summary(
+        self,
+        summary: RunSummary,
+        sources_checked: str,
+    ) -> bool:
         """Send a run summary message."""
+        report_date = summary.run_at
+        try:
+            report_date = datetime.fromisoformat(
+                summary.run_at.replace("Z", "+00:00")
+            ).strftime("%m/%d/%Y")
+        except ValueError:
+            pass
+        flagged_urls = summary.malicious + summary.suspicious
+        takedowns_requested = summary.malicious
         text = (
-            f"📊 <b>URL Scan Summary</b>\n\n"
-            f"🕐 Run at: {summary.run_at}\n"
-            f"📋 Total URLs checked: <b>{summary.total}</b>\n\n"
-            f"🔴 Malicious: <b>{summary.malicious}</b>\n"
-            f"🟡 Suspicious: <b>{summary.suspicious}</b>\n"
-            f"🟢 Clean: <b>{summary.clean}</b>\n"
-            f"❓ Unknown: <b>{summary.unknown}</b>\n"
-            f"❌ Failed: <b>{summary.failed}</b>\n\n"
-            f"🔔 Newly malicious: <b>{summary.newly_malicious}</b>\n"
-            f"⚠️ Newly suspicious: <b>{summary.newly_suspicious}</b>\n"
-            f"📈 Worsened: <b>{summary.worsened}</b>\n"
-            f"📉 Improved: <b>{summary.improved}</b>\n"
-            f"➡️ Unchanged: <b>{summary.unchanged}</b>"
+            f"🛡️ <b>Malicious URL Checks — {report_date}</b>\n\n"
+            f"<b>Summary</b>\n"
+            f"- Sources Checked: {_escape(sources_checked)}\n"
+            f"- URLs Checked: <b>{summary.total}</b>\n"
+            f"- Flagged URLs: <b>{flagged_urls}</b>\n"
+            f"- Takedowns Requested: <b>{takedowns_requested}</b>"
         )
         logger.info("Sending run summary")
         return self._send(text)
