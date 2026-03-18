@@ -13,6 +13,7 @@ from models import RunSummary, ScanResult, Verdict
 logger = logging.getLogger(__name__)
 
 _TELEGRAM_API = "https://api.telegram.org"
+_TAKEDOWN_REQUEST_URL = "https://www.virustotal.com/gui/contact-us"
 
 
 class TelegramClient:
@@ -81,7 +82,8 @@ class TelegramClient:
             f"🌐 Domain: <code>{_escape(result.domain)}</code>\n"
             f"🔴 Malicious engines: <b>{result.malicious_count}</b> / {result.total_engines}\n"
             f"🟡 Suspicious engines: {result.suspicious_count}\n"
-            f"⏰ Scanned at: {result.scanned_at}"
+            f"⏰ Scanned at: {result.scanned_at}\n"
+            f"📝 Request flag removal: {_TAKEDOWN_REQUEST_URL}"
             f"{change_note}"
             f"{domain_note}"
         )
@@ -112,7 +114,8 @@ class TelegramClient:
             f"🌐 Domain: <code>{_escape(result.domain)}</code>\n"
             f"🟡 Suspicious engines: <b>{result.suspicious_count}</b> / {result.total_engines}\n"
             f"🟢 Harmless engines: {result.harmless_count}\n"
-            f"⏰ Scanned at: {result.scanned_at}"
+            f"⏰ Scanned at: {result.scanned_at}\n"
+            f"📝 Request flag removal: {_TAKEDOWN_REQUEST_URL}"
             f"{change_note}"
         )
         logger.info("Sending suspicious alert for %s", result.normalized_url)
@@ -166,11 +169,14 @@ class TelegramClient:
         text = (
             f"🛡️ Malicious URL Checks — {report_date}\n\n"
             f"Summary\n"
+            f"- Date When The Scan is Done: {report_date}\n"
             f"- Sources Checked: {_escape(sources_checked)}\n"
             f"- URLs Checked: {summary.total}\n"
             f"- Flagged URLs: {flagged_urls}\n"
             f"- Takedowns Requested: {takedowns_requested}"
         )
+        if flagged_urls > 0:
+            text += f"\n- Request Flag Removal: {_TAKEDOWN_REQUEST_URL}"
         logger.info("Sending run summary")
         return self._send(text)
 
