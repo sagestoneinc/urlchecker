@@ -81,7 +81,7 @@ class Config:
     report_sources_checked: str = field(
         default_factory=lambda: _optional_env(
             "REPORT_SOURCES_CHECKED",
-            "Browser logs, spam reports, customer tickets",
+            "VirusTotal",
         )
     )
 
