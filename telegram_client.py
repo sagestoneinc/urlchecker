@@ -13,6 +13,7 @@ from models import RunSummary, ScanResult, Verdict
 logger = logging.getLogger(__name__)
 
 _TELEGRAM_API = "https://api.telegram.org"
+_TAKEDOWN_REQUEST_URL = "https://www.virustotal.com/gui/contact-us"
 
 
 class TelegramClient:
@@ -55,6 +56,28 @@ class TelegramClient:
         previous: Optional[ScanResult] = None,
     ) -> bool:
         """Send an alert for a newly malicious URL."""
+        text = self._build_malicious_alert_text(result, previous, include_flag_removal=False)
+        logger.info("Sending malicious alert for %s", result.normalized_url)
+        return self._send(text)
+
+    def send_malicious_alert_with_flag_removal(
+        self,
+        result: ScanResult,
+        previous: Optional[ScanResult] = None,
+    ) -> bool:
+        """Send a malicious alert that includes a flag-removal action link."""
+        text = self._build_malicious_alert_text(result, previous, include_flag_removal=True)
+        logger.info("Sending malicious alert for %s", result.normalized_url)
+        return self._send(text)
+
+    def _build_malicious_alert_text(
+        self,
+        result: ScanResult,
+        previous: Optional[ScanResult],
+        *,
+        include_flag_removal: bool,
+    ) -> str:
+        """Build malicious alert text; optionally include a flag-removal link."""
         change_note = ""
         if previous and previous.verdict != Verdict.MALICIOUS:
             change_note = (
@@ -75,18 +98,22 @@ class TelegramClient:
                 f"({result.domain_result.last_analysis_stats.get('malicious', 0)} engines)"
             )
 
+        removal_note = ""
+        if include_flag_removal:
+            removal_note = f"\n📝 Request flag removal: {_TAKEDOWN_REQUEST_URL}"
+
         text = (
             f"🚨 <b>MALICIOUS URL DETECTED</b>\n\n"
             f"🔗 <code>{_escape(result.normalized_url)}</code>\n"
             f"🌐 Domain: <code>{_escape(result.domain)}</code>\n"
             f"🔴 Malicious engines: <b>{result.malicious_count}</b> / {result.total_engines}\n"
             f"🟡 Suspicious engines: {result.suspicious_count}\n"
-            f"⏰ Scanned at: {result.scanned_at}"
+            f"⏰ Scanned at: {result.scanned_at}\n"
+            f"{removal_note}"
             f"{change_note}"
             f"{domain_note}"
         )
-        logger.info("Sending malicious alert for %s", result.normalized_url)
-        return self._send(text)
+        return text
 
     def send_suspicious_alert(
         self,
@@ -94,6 +121,28 @@ class TelegramClient:
         previous: Optional[ScanResult] = None,
     ) -> bool:
         """Send an alert for a newly suspicious URL."""
+        text = self._build_suspicious_alert_text(result, previous, include_flag_removal=False)
+        logger.info("Sending suspicious alert for %s", result.normalized_url)
+        return self._send(text)
+
+    def send_suspicious_alert_with_flag_removal(
+        self,
+        result: ScanResult,
+        previous: Optional[ScanResult] = None,
+    ) -> bool:
+        """Send a suspicious alert that includes a flag-removal action link."""
+        text = self._build_suspicious_alert_text(result, previous, include_flag_removal=True)
+        logger.info("Sending suspicious alert for %s", result.normalized_url)
+        return self._send(text)
+
+    def _build_suspicious_alert_text(
+        self,
+        result: ScanResult,
+        previous: Optional[ScanResult],
+        *,
+        include_flag_removal: bool,
+    ) -> str:
+        """Build suspicious alert text; optionally include a flag-removal link."""
         change_note = ""
         if previous and previous.verdict not in (Verdict.SUSPICIOUS, Verdict.MALICIOUS):
             change_note = (
@@ -106,17 +155,21 @@ class TelegramClient:
                 f"{previous.suspicious_count} → {result.suspicious_count}"
             )
 
+        removal_note = ""
+        if include_flag_removal:
+            removal_note = f"\n📝 Request flag removal: {_TAKEDOWN_REQUEST_URL}"
+
         text = (
             f"⚠️ <b>SUSPICIOUS URL DETECTED</b>\n\n"
             f"🔗 <code>{_escape(result.normalized_url)}</code>\n"
             f"🌐 Domain: <code>{_escape(result.domain)}</code>\n"
             f"🟡 Suspicious engines: <b>{result.suspicious_count}</b> / {result.total_engines}\n"
             f"🟢 Harmless engines: {result.harmless_count}\n"
-            f"⏰ Scanned at: {result.scanned_at}"
+            f"⏰ Scanned at: {result.scanned_at}\n"
+            f"{removal_note}"
             f"{change_note}"
         )
-        logger.info("Sending suspicious alert for %s", result.normalized_url)
-        return self._send(text)
+        return text
 
     def send_clean_alert(self, result: ScanResult, previous: ScanResult) -> bool:
         """Send an optional alert when a previously bad URL is now clean."""
@@ -154,6 +207,39 @@ class TelegramClient:
         sources_checked: str,
     ) -> bool:
         """Send a run summary message."""
+        text = self._build_summary_text(
+            summary,
+            sources_checked,
+            include_scan_date=False,
+            include_flag_removal=False,
+        )
+        logger.info("Sending run summary")
+        return self._send(text)
+
+    def send_summary_with_scan_date_and_flag_removal(
+        self,
+        summary: RunSummary,
+        sources_checked: str,
+    ) -> bool:
+        """Send an enhanced run summary with explicit scan date and action link."""
+        text = self._build_summary_text(
+            summary,
+            sources_checked,
+            include_scan_date=True,
+            include_flag_removal=True,
+        )
+        logger.info("Sending run summary")
+        return self._send(text)
+
+    def _build_summary_text(
+        self,
+        summary: RunSummary,
+        sources_checked: str,
+        *,
+        include_scan_date: bool,
+        include_flag_removal: bool,
+    ) -> str:
+        """Build summary text with optional scan-date and flag-removal lines."""
         report_date = summary.run_at
         try:
             report_date = datetime.fromisoformat(
@@ -163,16 +249,22 @@ class TelegramClient:
             pass
         flagged_urls = summary.malicious + summary.suspicious
         takedowns_requested = summary.malicious
+        scan_date_line = ""
+        if include_scan_date:
+            scan_date_line = f"- Date When The Scan is Done: {report_date}\n"
+
         text = (
             f"🛡️ Malicious URL Checks — {report_date}\n\n"
             f"Summary\n"
+            f"{scan_date_line}"
             f"- Sources Checked: {_escape(sources_checked)}\n"
             f"- URLs Checked: {summary.total}\n"
             f"- Flagged URLs: {flagged_urls}\n"
             f"- Takedowns Requested: {takedowns_requested}"
         )
-        logger.info("Sending run summary")
-        return self._send(text)
+        if include_flag_removal and flagged_urls > 0:
+            text += f"\n- Request Flag Removal: {_TAKEDOWN_REQUEST_URL}"
+        return text
 
 
 def _escape(text: str) -> str:

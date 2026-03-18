@@ -260,6 +260,12 @@ Summary
 - Takedowns Requested: 1
 ```
 
+Optional enhanced-format methods are available when you want the additional lines:
+
+- `send_malicious_alert_with_flag_removal(...)`
+- `send_suspicious_alert_with_flag_removal(...)`
+- `send_summary_with_scan_date_and_flag_removal(...)`
+
 ---
 
 ## Bot commands (issue comments)
