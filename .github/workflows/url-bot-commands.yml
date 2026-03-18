@@ -1,0 +1,134 @@
+name: URL Bot Commands
+
+on:
+  issue_comment:
+    types: [created]
+
+permissions:
+  actions: write
+  contents: write
+  issues: write
+
+jobs:
+  handle-command:
+    if: github.event.issue.pull_request == null && (startsWith(github.event.comment.body, '/add-link ') || startsWith(github.event.comment.body, '/rescan '))
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Parse command
+        id: parse
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const body = context.payload.comment.body.trim();
+            let command = "";
+            let url = "";
+            if (body.startsWith("/add-link ")) {
+              command = "add-link";
+              url = body.slice("/add-link ".length).trim();
+            } else if (body.startsWith("/rescan ")) {
+              command = "rescan";
+              url = body.slice("/rescan ".length).trim();
+            }
+
+            try {
+              const parsed = new URL(url);
+              if (!["http:", "https:"].includes(parsed.protocol)) {
+                throw new Error("Only http/https URLs are supported.");
+              }
+            } catch (err) {
+              core.setFailed(`Invalid URL in command: ${url}`);
+              return;
+            }
+
+            core.setOutput("command", command);
+            core.setOutput("url", url);
+
+      - name: Checkout repository
+        if: steps.parse.outputs.command == 'add-link'
+        uses: actions/checkout@v4
+
+      - name: Add URL to urls.txt if missing
+        if: steps.parse.outputs.command == 'add-link'
+        id: add_url
+        env:
+          TARGET_URL: ${{ steps.parse.outputs.url }}
+        run: |
+          python - << 'PY'
+          import os
+          from pathlib import Path
+
+          path = Path("urls.txt")
+          target = os.environ["TARGET_URL"].strip()
+
+          existing = set()
+          if path.exists():
+              for line in path.read_text(encoding="utf-8").splitlines():
+                  val = line.strip()
+                  if val and not val.startswith("#"):
+                      existing.add(val)
+
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as gh_out:
+              if target in existing:
+                  gh_out.write("added=false\n")
+              else:
+                  with path.open("a", encoding="utf-8") as fh:
+                      fh.write(f"{target}\n")
+                  gh_out.write("added=true\n")
+          PY
+
+      - name: Commit updated urls.txt
+        if: steps.parse.outputs.command == 'add-link' && steps.add_url.outputs.added == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add urls.txt
+          git commit -m "chore: add URL from bot command"
+          git push
+
+      - name: Trigger URL scan workflow for target URL
+        uses: actions/github-script@v7
+        env:
+          TARGET_URL: ${{ steps.parse.outputs.url }}
+        with:
+          script: |
+            const targetUrl = process.env.TARGET_URL;
+            await github.rest.actions.createWorkflowDispatch({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: "daily-url-scan.yml",
+              ref: context.payload.repository.default_branch,
+              inputs: {
+                dry_run: "false",
+                debug: "false",
+                single_url: targetUrl
+              }
+            });
+
+      - name: Reply with command status
+        uses: actions/github-script@v7
+        env:
+          COMMAND_NAME: ${{ steps.parse.outputs.command }}
+          TARGET_URL: ${{ steps.parse.outputs.url }}
+          URL_ADDED: ${{ steps.add_url.outputs.added }}
+        with:
+          script: |
+            const command = process.env.COMMAND_NAME;
+            const url = process.env.TARGET_URL;
+            const added = process.env.URL_ADDED;
+            let status = `✅ Command processed: \`/${command}\``;
+            if (command === "add-link") {
+              if (added === "true") {
+                status += `\n- Added to \`urls.txt\`: ${url}`;
+              } else {
+                status += `\n- URL already existed in \`urls.txt\`: ${url}`;
+              }
+            }
+            status += `\n- Rescan queued for: ${url}`;
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: status
+            });

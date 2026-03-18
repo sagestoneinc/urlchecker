@@ -223,7 +223,7 @@ def run_scan(
 
     # Optional summary alert
     if send_summary and telegram and not dry_run:
-        telegram.send_summary(summary)
+        telegram.send_summary(summary, config.report_sources_checked)
 
     logger.info(
         "Run complete – total=%d malicious=%d suspicious=%d clean=%d "

@@ -1,9 +1,9 @@
 name: Daily Malicious URL Checker
 
 on:
-  # Run automatically every day at 06:00 UTC
+  # Run automatically every day at 06:00 EST (11:00 UTC)
   schedule:
-    - cron: "0 6 * * *"
+    - cron: "0 11 * * *"
 
   # Allow manual trigger from the GitHub Actions UI
   workflow_dispatch:
@@ -24,6 +24,11 @@ on:
         options:
           - "false"
           - "true"
+      single_url:
+        description: "Optional single URL to scan (overrides urls.txt for this run)"
+        required: false
+        default: ""
+        type: string
 
 # Prevent overlapping scheduled runs
 concurrency:
@@ -64,16 +69,23 @@ jobs:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           SEND_SUMMARY: "true"
+          ALERT_ON_CLEAN: "true"
+          REPORT_SOURCES_CHECKED: "Browser logs, spam reports, customer tickets"
           RESULTS_DIR: results
         run: |
           EXTRA_FLAGS=""
+          INPUT_FLAG=""
           if [ "${{ github.event.inputs.dry_run }}" = "true" ]; then
             EXTRA_FLAGS="$EXTRA_FLAGS --dry-run"
           fi
           if [ "${{ github.event.inputs.debug }}" = "true" ]; then
             EXTRA_FLAGS="$EXTRA_FLAGS --debug"
           fi
-          python main.py --run-once --alert-summary $EXTRA_FLAGS
+          if [ -n "${{ github.event.inputs.single_url }}" ]; then
+            printf '%s\n' "${{ github.event.inputs.single_url }}" > /tmp/single_url.txt
+            INPUT_FLAG="--input /tmp/single_url.txt"
+          fi
+          python main.py --run-once --alert-summary $INPUT_FLAG $EXTRA_FLAGS
 
       - name: Upload scan results as artifacts
         if: always()
