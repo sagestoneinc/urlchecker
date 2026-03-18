@@ -234,7 +234,6 @@ Alerts are sent **only when something changes** (no duplicate alerts):
 🔴 Malicious engines: 42 / 90
 🟡 Suspicious engines: 3
 ⏰ Scanned at: 2024-01-15T06:12:34+00:00
-📝 Request flag removal: https://www.virustotal.com/gui/contact-us
 🔄 Status changed: clean → malicious
 ```
 
@@ -247,7 +246,6 @@ Alerts are sent **only when something changes** (no duplicate alerts):
 🟡 Suspicious engines: 5 / 90
 🟢 Harmless engines: 72
 ⏰ Scanned at: 2024-01-15T06:14:01+00:00
-📝 Request flag removal: https://www.virustotal.com/gui/contact-us
 🔄 Status changed: clean → suspicious
 ```
 
@@ -256,13 +254,17 @@ Alerts are sent **only when something changes** (no duplicate alerts):
 🛡️ Malicious URL Checks — 02/22/2026
 
 Summary
-- Date When The Scan is Done: 02/22/2026
 - Sources Checked: VirusTotal
 - URLs Checked: 25
 - Flagged URLs: 3
 - Takedowns Requested: 1
-- Request Flag Removal: https://www.virustotal.com/gui/contact-us
 ```
+
+Optional enhanced-format methods are available when you want the additional lines:
+
+- `send_malicious_alert_with_flag_removal(...)`
+- `send_suspicious_alert_with_flag_removal(...)`
+- `send_summary_with_scan_date_and_flag_removal(...)`
 
 ---
 
