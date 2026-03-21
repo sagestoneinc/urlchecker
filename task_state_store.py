@@ -118,8 +118,6 @@ class TaskStateStore:
             ):
                 item.chat_id = subscription.chat_id
                 item.timezone = subscription.timezone
-                item.project_id = subscription.project_id
-                item.assignee_id = subscription.assignee_id
                 self.save()
                 return
 
