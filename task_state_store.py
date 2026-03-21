@@ -104,6 +104,25 @@ class TaskStateStore:
         return action
 
     def add_reminder(self, subscription: ReminderSubscription) -> None:
+        key_user = str(subscription.telegram_user_id)
+        key_type = str(subscription.reminder_type)
+        key_project = str(subscription.project_id)
+        key_assignee = str(subscription.assignee_id)
+
+        for item in self._state.reminders:
+            if (
+                str(item.telegram_user_id) == key_user
+                and str(item.reminder_type) == key_type
+                and str(item.project_id) == key_project
+                and str(item.assignee_id) == key_assignee
+            ):
+                item.chat_id = subscription.chat_id
+                item.timezone = subscription.timezone
+                item.project_id = subscription.project_id
+                item.assignee_id = subscription.assignee_id
+                self.save()
+                return
+
         self._state.reminders.append(subscription)
         self.save()
 

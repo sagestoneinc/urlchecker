@@ -32,7 +32,7 @@ class TaskReminderEngine:
         self._send_message = send_message
 
     def run_once(self, now_utc: datetime | None = None) -> ReminderDispatchResult:
-        now = now_utc or datetime.now(timezone.utc).replace(tzinfo=None)
+        now = self._normalize_utc_naive(now_utc)
         result = ReminderDispatchResult()
         for sub in self._state.list_reminders():
             if not self._should_send(sub, now):
@@ -117,6 +117,14 @@ class TaskReminderEngine:
             elif reminder_type == "due_tomorrow" and due_day == tomorrow:
                 output.append(task)
         return output
+
+    @staticmethod
+    def _normalize_utc_naive(value: datetime | None) -> datetime:
+        if value is None:
+            return datetime.now(timezone.utc).replace(tzinfo=None)
+        if value.tzinfo is not None:
+            return value.astimezone(timezone.utc).replace(tzinfo=None)
+        return value
 
     @staticmethod
     def _task_due_date(task: HubstaffTask) -> date | None:

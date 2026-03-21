@@ -26,9 +26,11 @@ class TelegramTaskHandlers:
         *,
         hubstaff_client: HubstaffClient,
         state_store: TaskStateStore,
+        default_timezone: str = "UTC",
     ) -> None:
         self._hubstaff = hubstaff_client
         self._state = state_store
+        self._default_timezone = default_timezone or "UTC"
 
     def handle_command(
         self,
@@ -42,8 +44,11 @@ class TelegramTaskHandlers:
             return HandlerResponse(text="Empty command.")
 
         pending = self._state.pop_pending_action(telegram_user_id)
-        if pending and not message.startswith("/"):
+        is_command = message.startswith("/")
+        if pending and not is_command:
             return self._handle_pending_action(telegram_user_id=telegram_user_id, pending=pending, value=message)
+        if pending and is_command:
+            self._state.put_pending_action(telegram_user_id, pending)
 
         command, _, args = message.partition(" ")
         command = command.lower()
@@ -66,7 +71,7 @@ class TelegramTaskHandlers:
             return self._handle_list_reminders(telegram_user_id)
         return HandlerResponse(text="Unknown command. Use /help.")
 
-    def handle_callback_query(self, *, telegram_user_id: str, data: str) -> HandlerResponse:
+    def handle_callback_query(self, *, telegram_user_id: str, chat_id: str, data: str) -> HandlerResponse:
         if data.startswith("task:"):
             task_id = data.split(":", 1)[1]
             return self._handle_task_detail(task_id)
@@ -77,7 +82,7 @@ class TelegramTaskHandlers:
             reminder_type = data.split(":", 1)[1]
             return self._handle_remind(
                 telegram_user_id=telegram_user_id,
-                chat_id="",
+                chat_id=chat_id,
                 args=f"subscribe {reminder_type}",
             )
         return HandlerResponse(text="Unsupported action.")
@@ -90,7 +95,8 @@ class TelegramTaskHandlers:
             "/assign <task_id> <user query or user_id>\n"
             "/edit <task_id> <title|description|due|labels|status>\n"
             "/complete <task_id>\n"
-            "/remind subscribe <open_tasks|overdue|due_today|due_tomorrow|daily_digest|weekday_morning_digest> [timezone=UTC] [project=<id>] [assignee=<id>]\n"
+            "/remind subscribe <open_tasks|overdue|due_today|due_tomorrow|daily_digest|weekday_morning_digest> "
+            f"[timezone={self._default_timezone}] [project=<id>] [assignee=<id>]\n"
             "/remind unsubscribe <type>\n"
             "/reminders"
         )
@@ -190,7 +196,13 @@ class TelegramTaskHandlers:
     def _handle_remind(self, *, telegram_user_id: str, chat_id: str, args: str) -> HandlerResponse:
         parts = args.split()
         if len(parts) < 2:
-            return HandlerResponse(text="Usage: /remind subscribe <type> [timezone=UTC] [project=<id>] [assignee=<id>] OR /remind unsubscribe <type>")
+            return HandlerResponse(
+                text=(
+                    "/remind subscribe <type> "
+                    f"[timezone={self._default_timezone}] [project=<id>] [assignee=<id>] "
+                    "OR /remind unsubscribe <type>"
+                )
+            )
 
         action = parts[0].lower()
         reminder_type = parts[1].lower()
@@ -208,7 +220,7 @@ class TelegramTaskHandlers:
             telegram_user_id=str(telegram_user_id),
             chat_id=str(chat_id),
             reminder_type=reminder_type,
-            timezone=options.get("timezone", "UTC"),
+            timezone=options.get("timezone", self._default_timezone),
             project_id=options.get("project", ""),
             assignee_id=options.get("assignee", ""),
         )

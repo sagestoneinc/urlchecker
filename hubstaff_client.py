@@ -34,7 +34,7 @@ class HubstaffClient:
         self._tasks_path = tasks_path
         self._users_path = users_path
         self._statuses_path = statuses_path
-        self._done_status_ids = {str(item) for item in (done_status_ids or []) if str(item)}
+        self._done_status_ids = [str(item) for item in (done_status_ids or []) if str(item)]
 
         retry = Retry(
             total=max_retries,
@@ -108,7 +108,7 @@ class HubstaffClient:
 
     def _find_done_status_id(self, *, project_id: str = "") -> str:
         if self._done_status_ids:
-            return next(iter(self._done_status_ids))
+            return self._done_status_ids[0]
 
         params: dict[str, Any] = {}
         if project_id:

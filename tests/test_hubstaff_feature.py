@@ -1,6 +1,6 @@
 import tempfile
 import unittest
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 from hubstaff_auth import HubstaffAuth
@@ -62,6 +62,31 @@ class HubstaffFeatureTests(unittest.TestCase):
         task = client.complete_task("10")
         self.assertEqual(task.status_id, "done-1")
 
+    def test_complete_task_prefers_first_configured_done_status_id(self) -> None:
+        auth = HubstaffAuth(access_token="abc")
+        client = HubstaffClient(
+            auth=auth,
+            base_url="https://api.example.test",
+            done_status_ids=["done-a", "done-b"],
+        )
+
+        def fake_request(method, path, params=None, json=None):
+            if method == "GET" and path == "/v2/tasks/10":
+                return {"task": {"id": "10", "title": "A", "project_id": "p1"}}
+            if method == "PATCH" and path == "/v2/tasks/10":
+                return {
+                    "task": {
+                        "id": "10",
+                        "title": "A",
+                        "status": {"id": json["task"]["status_id"], "name": "Done"},
+                    }
+                }
+            raise AssertionError(f"Unexpected request: {method} {path}")
+
+        client._request = fake_request  # type: ignore[assignment]
+        task = client.complete_task("10")
+        self.assertEqual(task.status_id, "done-a")
+
     def test_handlers_support_listing_detail_assign_complete_edit_and_callback(self) -> None:
         class FakeHubstaff:
             def __init__(self):
@@ -93,7 +118,11 @@ class HubstaffFeatureTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             store = TaskStateStore(Path(tmp) / "state.json")
             store.merge_user_mapping({"100": "u1"})
-            handlers = TelegramTaskHandlers(hubstaff_client=FakeHubstaff(), state_store=store)
+            handlers = TelegramTaskHandlers(
+                hubstaff_client=FakeHubstaff(),
+                state_store=store,
+                default_timezone="America/New_York",
+            )
 
             listed = handlers.handle_command(telegram_user_id="100", chat_id="200", text="/tasks mine")
             self.assertIn("Tasks:", listed.text)
@@ -111,11 +140,27 @@ class HubstaffFeatureTests(unittest.TestCase):
             start_edit = handlers.handle_command(telegram_user_id="100", chat_id="200", text="/edit 1 title")
             self.assertIn("Send the new value", start_edit.text)
 
+            help_text = handlers.handle_command(telegram_user_id="100", chat_id="200", text="/help")
+            self.assertIn("timezone=America/New_York", help_text.text)
+
+            # Pending edit should be preserved when issuing slash command
+            still_editing = handlers.handle_command(telegram_user_id="100", chat_id="200", text="/task 1")
+            self.assertIn("Task #1", still_editing.text)
             finish_edit = handlers.handle_command(telegram_user_id="100", chat_id="200", text="Updated title")
             self.assertIn("updated", finish_edit.text.lower())
 
-            callback = handlers.handle_callback_query(telegram_user_id="100", data="task:1")
+            callback = handlers.handle_callback_query(telegram_user_id="100", chat_id="200", data="task:1")
             self.assertIn("Task #1", callback.text)
+
+            subscribe_callback = handlers.handle_callback_query(
+                telegram_user_id="100",
+                chat_id="200",
+                data="remind:due_today",
+            )
+            self.assertIn("Subscribed to due_today reminders", subscribe_callback.text)
+            reminders = store.list_reminders()
+            self.assertEqual(reminders[-1].chat_id, "200")
+            self.assertEqual(reminders[-1].timezone, "America/New_York")
 
     def test_reminder_engine_sends_due_today(self) -> None:
         class FakeHubstaff:
@@ -149,6 +194,65 @@ class HubstaffFeatureTests(unittest.TestCase):
             self.assertEqual(result.sent_count, 1)
             self.assertEqual(len(sent), 1)
             self.assertIn("Tasks due today", sent[0][1])
+
+    def test_reminder_engine_accepts_aware_now_argument(self) -> None:
+        class FakeHubstaff:
+            def list_tasks(self, filters=None, per_page=50):
+                return [HubstaffTask(id="1", title="Open", due_at="2026-03-21")]
+
+        sent = []
+
+        def send_message(chat_id: str, text: str) -> None:
+            sent.append((chat_id, text))
+
+        with tempfile.TemporaryDirectory() as tmp:
+            store = TaskStateStore(Path(tmp) / "state.json")
+            store.add_reminder(
+                ReminderSubscription(
+                    telegram_user_id="100",
+                    chat_id="200",
+                    reminder_type="open_tasks",
+                    timezone="UTC",
+                    last_sent_at="2026-03-21T04:00:00",
+                )
+            )
+            engine = TaskReminderEngine(
+                hubstaff_client=FakeHubstaff(),
+                state_store=store,
+                send_message=send_message,
+            )
+            aware_now = datetime(2026, 3, 21, 9, 0, tzinfo=timezone.utc)
+            result = engine.run_once(now_utc=aware_now)
+            self.assertEqual(result.sent_count, 1)
+            self.assertEqual(len(sent), 1)
+
+    def test_state_store_deduplicates_reminders(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            store = TaskStateStore(Path(tmp) / "state.json")
+            first = ReminderSubscription(
+                telegram_user_id="100",
+                chat_id="200",
+                reminder_type="due_today",
+                timezone="UTC",
+                project_id="p1",
+                assignee_id="u1",
+                last_sent_at="2026-03-20T09:00:00",
+            )
+            second = ReminderSubscription(
+                telegram_user_id="100",
+                chat_id="300",
+                reminder_type="due_today",
+                timezone="America/New_York",
+                project_id="p1",
+                assignee_id="u1",
+            )
+            store.add_reminder(first)
+            store.add_reminder(second)
+            reminders = store.list_reminders()
+            self.assertEqual(len(reminders), 1)
+            self.assertEqual(reminders[0].chat_id, "300")
+            self.assertEqual(reminders[0].timezone, "America/New_York")
+            self.assertEqual(reminders[0].last_sent_at, "2026-03-20T09:00:00")
 
 
 if __name__ == "__main__":

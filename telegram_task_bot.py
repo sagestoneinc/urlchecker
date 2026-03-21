@@ -94,6 +94,7 @@ class TelegramTaskBot:
         from_user = callback.get("from") or {}
         response = self._handlers.handle_callback_query(
             telegram_user_id=str(from_user.get("id", "")),
+            chat_id=str(chat.get("id", "")),
             data=data,
         )
         self._answer_callback_query(callback.get("id", ""))

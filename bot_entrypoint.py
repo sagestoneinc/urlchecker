@@ -58,7 +58,11 @@ def _build_task_stack(config: Config) -> tuple[TelegramTaskBot, TaskReminderEngi
         done_status_ids=done_ids,
     )
 
-    handlers = TelegramTaskHandlers(hubstaff_client=hubstaff, state_store=state)
+    handlers = TelegramTaskHandlers(
+        hubstaff_client=hubstaff,
+        state_store=state,
+        default_timezone=config.taskbot_default_timezone,
+    )
     bot = TelegramTaskBot(
         bot_token=config.telegram_bot_token,
         handlers=handlers,

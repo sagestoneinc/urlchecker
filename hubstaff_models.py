@@ -95,5 +95,5 @@ def _parse_iso(value: str) -> Optional[datetime]:
     except ValueError:
         return None
     if dt.tzinfo:
-        return dt.astimezone().replace(tzinfo=None)
+        return dt.astimezone(timezone.utc).replace(tzinfo=None)
     return dt
