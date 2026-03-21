@@ -173,6 +173,54 @@ python main.py --run-once --debug
 
 ---
 
+## Optional Hubstaff Tasks Telegram assistant
+
+This repository now includes an **additive, optional** task-bot subsystem for Hubstaff Tasks.
+It is disabled by default and does not change the existing URL scanner behavior.
+
+### Runtime modes
+
+- URL scanner (existing behavior, unchanged): `python main.py --run-once ...`
+- Task bot (new optional behavior): `python bot_entrypoint.py ...`
+
+### Enable task bot
+
+1. Configure the new variables in `.env`:
+   - `ENABLE_HUBSTAFF_TASKS_BOT=true`
+   - `HUBSTAFF_TOKEN=<your token>`
+   - `TELEGRAM_BOT_TOKEN=<your bot token>`
+   - optional: `TASKBOT_USER_MAPPING_JSON={"<telegram_user_id>":"<hubstaff_user_id>"}`  
+2. Start polling runtime:
+
+```bash
+python bot_entrypoint.py
+```
+
+### Task bot commands
+
+```text
+/tasks [mine|open|overdue|today|week] [project=<id>] [assignee=<id>] [label=<text>] [status=<id>] [q=<text>]
+/task <task_id>
+/assign <task_id> <user query or user_id>
+/edit <task_id> <title|description|due|labels|status>
+/complete <task_id>
+/remind subscribe <open_tasks|overdue|due_today|due_tomorrow|daily_digest|weekday_morning_digest> [timezone=UTC] [project=<id>] [assignee=<id>]
+/remind unsubscribe <type>
+/reminders
+```
+
+### Reminder persistence
+
+Reminder subscriptions and task-bot conversation state are persisted at:
+
+```text
+TASKBOT_STATE_FILE=results/taskbot_state.json
+```
+
+Use `python bot_entrypoint.py --run-reminders-once` to run reminder dispatch independently (for example via a separate scheduler/container).
+
+---
+
 ## Storage strategy
 
 ### Default (GitHub Actions artifacts)
