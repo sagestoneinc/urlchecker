@@ -12,6 +12,8 @@ from telegram_client import TelegramClient
 
 
 class RegressionCompatibilityTests(unittest.TestCase):
+    _REPO_ROOT = Path(__file__).resolve().parents[1]
+
     def test_cli_flags_parse(self) -> None:
         with patch("sys.argv", ["main.py", "--run-once", "--dry-run", "--alert-summary", "--debug", "--input", "my_urls.txt"]):
             args = _parse_args()
@@ -54,9 +56,9 @@ class RegressionCompatibilityTests(unittest.TestCase):
         self.assertIn("Request Flag Removal", text)
 
     def test_issue_comment_commands_workflow_contains_expected_commands(self) -> None:
-        workflow = Path(
-            "/home/runner/work/urlchecker/urlchecker/.github/workflows/url-bot-commands.yml"
-        ).read_text(encoding="utf-8")
+        workflow = (self._REPO_ROOT / ".github/workflows/url-bot-commands.yml").read_text(
+            encoding="utf-8"
+        )
         self.assertIn("/add-link ", workflow)
         self.assertIn("/rescan ", workflow)
 

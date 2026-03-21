@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from typing import Callable
 from zoneinfo import ZoneInfo
 
@@ -32,7 +32,7 @@ class TaskReminderEngine:
         self._send_message = send_message
 
     def run_once(self, now_utc: datetime | None = None) -> ReminderDispatchResult:
-        now = now_utc or datetime.utcnow()
+        now = now_utc or datetime.now(timezone.utc).replace(tzinfo=None)
         result = ReminderDispatchResult()
         for sub in self._state.list_reminders():
             if not self._should_send(sub, now):

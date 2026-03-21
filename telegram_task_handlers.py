@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any, Optional
 
 from hubstaff_client import HubstaffClient
@@ -247,12 +247,12 @@ class TelegramTaskHandlers:
                 if lower == "mine":
                     filters["mine"] = True
                 elif lower == "overdue":
-                    filters["due_before"] = datetime.utcnow().date().isoformat()
+                    filters["due_before"] = self._utc_today().date().isoformat()
                 elif lower == "today":
-                    today = datetime.utcnow().date().isoformat()
+                    today = self._utc_today().date().isoformat()
                     filters["due_on"] = today
                 elif lower == "week":
-                    end = datetime.utcnow().date() + timedelta(days=7)
+                    end = self._utc_today().date() + timedelta(days=7)
                     filters["due_before"] = end.isoformat()
                 elif lower == "open":
                     filters["state"] = "open"
@@ -306,3 +306,7 @@ class TelegramTaskHandlers:
             f"URL: {task.web_url or 'N/A'}\n\n"
             f"Description:\n{task.description or 'N/A'}"
         )
+
+    @staticmethod
+    def _utc_today() -> datetime:
+        return datetime.now(timezone.utc)

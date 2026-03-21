@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Optional
 
 
@@ -85,7 +85,7 @@ class HubstaffTask:
         due = _parse_iso(self.due_at)
         if not due:
             return False
-        return due < datetime.utcnow()
+        return due < datetime.now(timezone.utc).replace(tzinfo=None)
 
 
 def _parse_iso(value: str) -> Optional[datetime]:
