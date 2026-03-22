@@ -57,10 +57,10 @@ class TelegramTaskBot:
                     "Another poller may already be running."
                 )
                 return 0
-            logger.error("Task bot run_once failed: %s", exc)
+            logger.error("Task bot run_once failed during getUpdates: %s", exc)
             return 1
         except Exception as exc:
-            logger.error("Task bot run_once failed: %s", exc)
+            logger.error("Task bot run_once failed before update processing: %s", exc)
             return 1
 
         try:
@@ -71,7 +71,7 @@ class TelegramTaskBot:
                 self._handle_update(update)
             return 0
         except Exception as exc:
-            logger.error("Task bot run_once failed: %s", exc)
+            logger.error("Task bot run_once failed while processing updates: %s", exc)
             return 1
 
     def _get_updates(self) -> list[dict[str, Any]]:
