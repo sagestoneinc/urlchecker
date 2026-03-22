@@ -361,6 +361,8 @@ class HubstaffFeatureTests(unittest.TestCase):
 
             exit_code = bot.run_once()
             self.assertEqual(exit_code, 0)
+            bot._delete_webhook.assert_called_once()
+            self.assertEqual(bot._get_updates.call_count, 2)
             self.assertEqual(store.last_update_id(), 42)
 
 
