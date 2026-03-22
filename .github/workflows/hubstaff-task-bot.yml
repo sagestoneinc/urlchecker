@@ -13,6 +13,7 @@ concurrency:
   cancel-in-progress: true
 jobs:
   task-bot:
+    if: ${{ secrets.HUBSTAFF_TOKEN != '' && secrets.TELEGRAM_BOT_TOKEN != '' }}
     runs-on: ubuntu-latest
 
     steps:

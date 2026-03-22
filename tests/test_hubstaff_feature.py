@@ -8,6 +8,7 @@ from hubstaff_client import HubstaffClient
 from hubstaff_models import HubstaffTask
 from task_reminders import TaskReminderEngine
 from task_state_store import ReminderSubscription, TaskStateStore
+from telegram_task_bot import TelegramTaskBot
 from telegram_task_handlers import TelegramTaskHandlers
 
 
@@ -253,6 +254,56 @@ class HubstaffFeatureTests(unittest.TestCase):
             self.assertEqual(reminders[0].chat_id, "300")
             self.assertEqual(reminders[0].timezone, "America/New_York")
             self.assertEqual(reminders[0].last_sent_at, "2026-03-20T09:00:00")
+
+    def test_state_store_persists_last_update_id(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            state_path = Path(tmp) / "state.json"
+            store = TaskStateStore(state_path)
+            store.set_last_update_id(123)
+
+            reloaded = TaskStateStore(state_path)
+            self.assertEqual(reloaded.last_update_id(), 123)
+
+    def test_task_bot_run_once_persists_processed_update_offset(self) -> None:
+        class FakeHandlers:
+            def handle_command(self, telegram_user_id: str, chat_id: str, text: str):
+                from telegram_task_handlers import HandlerResponse
+
+                return HandlerResponse(text="ok")
+
+            def handle_callback_query(self, telegram_user_id: str, chat_id: str, data: str):
+                from telegram_task_handlers import HandlerResponse
+
+                return HandlerResponse(text="ok")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            store = TaskStateStore(Path(tmp) / "state.json")
+            bot = TelegramTaskBot(
+                bot_token="token",
+                handlers=FakeHandlers(),  # type: ignore[arg-type]
+                state_store=store,
+                poll_timeout_seconds=1,
+                poll_interval_seconds=1,
+            )
+
+            bot._get_updates = lambda: [  # type: ignore[assignment]
+                {
+                    "update_id": 42,
+                    "message": {
+                        "text": "/help",
+                        "from": {"id": 100},
+                        "chat": {"id": 200},
+                    },
+                }
+            ]
+            bot._send_message = lambda **kwargs: None  # type: ignore[assignment]
+
+            exit_code = bot.run_once()
+            self.assertEqual(exit_code, 0)
+            self.assertEqual(store.last_update_id(), 42)
+
+            reloaded = TaskStateStore(Path(tmp) / "state.json")
+            self.assertEqual(reloaded.last_update_id(), 42)
 
 
 if __name__ == "__main__":

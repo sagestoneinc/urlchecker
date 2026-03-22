@@ -47,6 +47,7 @@ class TaskBotState:
     user_mapping: dict[str, str] = field(default_factory=dict)
     reminders: list[ReminderSubscription] = field(default_factory=list)
     pending_actions: dict[str, dict[str, Any]] = field(default_factory=dict)
+    last_update_id: int = 0
 
 
 class TaskStateStore:
@@ -63,6 +64,7 @@ class TaskStateStore:
         mapping = payload.get("user_mapping") if isinstance(payload, dict) else {}
         reminders_payload = payload.get("reminders") if isinstance(payload, dict) else []
         pending_actions = payload.get("pending_actions") if isinstance(payload, dict) else {}
+        last_update_id = payload.get("last_update_id") if isinstance(payload, dict) else 0
         reminders = []
         if isinstance(reminders_payload, list):
             reminders = [
@@ -74,6 +76,7 @@ class TaskStateStore:
             user_mapping={str(k): str(v) for k, v in (mapping or {}).items()},
             reminders=reminders,
             pending_actions={str(k): v for k, v in (pending_actions or {}).items()},
+            last_update_id=int(last_update_id or 0),
         )
         return self._state
 
@@ -82,8 +85,19 @@ class TaskStateStore:
             "user_mapping": self._state.user_mapping,
             "reminders": [item.to_dict() for item in self._state.reminders],
             "pending_actions": self._state.pending_actions,
+            "last_update_id": int(self._state.last_update_id),
         }
         self._path.write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
+
+    def last_update_id(self) -> int:
+        return int(self._state.last_update_id)
+
+    def set_last_update_id(self, update_id: int) -> None:
+        normalized = max(int(update_id), 0)
+        if normalized == self._state.last_update_id:
+            return
+        self._state.last_update_id = normalized
+        self.save()
 
     def merge_user_mapping(self, mapping: dict[str, str]) -> None:
         for tg_user, hubstaff_user in mapping.items():

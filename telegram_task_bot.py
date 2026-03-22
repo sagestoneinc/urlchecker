@@ -8,6 +8,7 @@ from typing import Any
 
 import requests
 
+from task_state_store import TaskStateStore
 from telegram_task_handlers import HandlerResponse, TelegramTaskHandlers
 
 logger = logging.getLogger(__name__)
@@ -19,14 +20,17 @@ class TelegramTaskBot:
         *,
         bot_token: str,
         handlers: TelegramTaskHandlers,
+        state_store: TaskStateStore,
         poll_timeout_seconds: int = 30,
         poll_interval_seconds: int = 2,
     ) -> None:
         self._token = bot_token
         self._handlers = handlers
+        self._state = state_store
         self._poll_timeout = poll_timeout_seconds
         self._poll_interval = poll_interval_seconds
-        self._offset = 0
+        last_update_id = self._state.last_update_id()
+        self._offset = last_update_id + 1 if last_update_id > 0 else 0
         self._base_url = f"https://api.telegram.org/bot{bot_token}"
 
     def run_forever(self) -> None:
@@ -35,7 +39,9 @@ class TelegramTaskBot:
             try:
                 updates = self._get_updates()
                 for update in updates:
-                    self._offset = max(self._offset, update.get("update_id", 0) + 1)
+                    update_id = int(update.get("update_id", 0))
+                    self._offset = max(self._offset, update_id + 1)
+                    self._state.set_last_update_id(update_id)
                     self._handle_update(update)
             except Exception as exc:
                 logger.error("Task bot loop error: %s", exc)
@@ -44,7 +50,9 @@ class TelegramTaskBot:
     def run_once(self) -> int:
         try:
             for update in self._get_updates():
-                self._offset = max(self._offset, update.get("update_id", 0) + 1)
+                update_id = int(update.get("update_id", 0))
+                self._offset = max(self._offset, update_id + 1)
+                self._state.set_last_update_id(update_id)
                 self._handle_update(update)
             return 0
         except Exception as exc:

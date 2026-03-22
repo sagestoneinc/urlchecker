@@ -66,6 +66,7 @@ def _build_task_stack(config: Config) -> tuple[TelegramTaskBot, TaskReminderEngi
     bot = TelegramTaskBot(
         bot_token=config.telegram_bot_token,
         handlers=handlers,
+        state_store=state,
         poll_timeout_seconds=config.taskbot_poll_timeout_seconds,
         poll_interval_seconds=config.taskbot_poll_interval_seconds,
     )
