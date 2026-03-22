@@ -46,7 +46,7 @@ jobs:
 
       - name: Checkout repository
         if: steps.parse.outputs.command == 'add-link'
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Add URL to urls.txt if missing
         if: steps.parse.outputs.command == 'add-link'
