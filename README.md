@@ -212,6 +212,8 @@ python bot_entrypoint.py
 ### Task bot commands
 
 ```text
+/menu (shows quick action buttons)
+/hubstaff or /hubspot (aliases of /menu)
 /tasks [mine|open|overdue|today|week] [project=<id>] [assignee=<id>] [label=<text>] [status=<id>] [q=<text>]
 /task <task_id>
 /assign <task_id> <user query or user_id>
