@@ -25,15 +25,17 @@ class TelegramClient:
     def __init__(self, bot_token: str, chat_id: str | list[str]) -> None:
         # Tokens are never logged
         self._token = bot_token
-        if isinstance(chat_id, list):
-            self._chat_ids = [item.strip() for item in chat_id if item and item.strip()]
-        else:
-            self._chat_ids = [item.strip() for item in chat_id.split(",") if item.strip()]
+        raw_chat_ids = chat_id if isinstance(chat_id, list) else chat_id.split(",")
+        self._chat_ids = [item.strip() for item in raw_chat_ids if item.strip()]
         self._base = f"{_TELEGRAM_API}/bot{bot_token}"
 
     def _send(self, text: str, parse_mode: str = "HTML") -> bool:
         """Send a message; return True on success."""
+        if not self._chat_ids:
+            logger.error("Telegram send skipped: no chat IDs configured")
+            return False
         sent_any = False
+        had_failures = False
         for chat_id in self._chat_ids:
             try:
                 resp = requests.post(
@@ -49,10 +51,12 @@ class TelegramClient:
                 resp.raise_for_status()
                 sent_any = True
             except requests.HTTPError as exc:
+                had_failures = True
                 logger.error("Telegram HTTP error for chat %s: %s", chat_id, exc)
             except Exception as exc:
+                had_failures = True
                 logger.error("Telegram send failed for chat %s: %s", chat_id, exc)
-        return sent_any
+        return sent_any and not had_failures
 
     # ------------------------------------------------------------------
     # Alert messages
