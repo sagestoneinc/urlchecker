@@ -196,6 +196,13 @@ It is disabled by default and does not change the existing URL scanner behavior.
 python bot_entrypoint.py
 ```
 
+### Activate in GitHub Actions
+
+1. Add the required repository secret:
+   - `HUBSTAFF_TOKEN=<your token>`
+2. Enable and trigger **Actions → Hubstaff Tasks Bot**.
+3. The workflow runs every 5 minutes and can also be started manually.
+
 ### Task bot commands
 
 ```text
