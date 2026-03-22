@@ -1,0 +1,38 @@
+name: Hubstaff Tasks Bot
+
+on:
+  schedule:
+    - cron: "*/30 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hubstaff-task-bot
+  cancel-in-progress: true
+jobs:
+  task-bot:
+    if: ${{ secrets.HUBSTAFF_TOKEN != '' && secrets.TELEGRAM_BOT_TOKEN != '' }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install --upgrade pip && pip install -r requirements.txt
+
+      - name: Run Hubstaff task bot once
+        env:
+          ENABLE_HUBSTAFF_TASKS_BOT: "true"
+          HUBSTAFF_TOKEN: ${{ secrets.HUBSTAFF_TOKEN }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TASKBOT_USER_MAPPING_JSON: ${{ secrets.TASKBOT_USER_MAPPING_JSON }}
+        run: python bot_entrypoint.py --run-once

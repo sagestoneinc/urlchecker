@@ -196,6 +196,15 @@ It is disabled by default and does not change the existing URL scanner behavior.
 python bot_entrypoint.py
 ```
 
+### Activate in GitHub Actions
+
+1. Add the necessary repository secrets:
+   - `HUBSTAFF_TOKEN=<your token>` (required)
+   - `TELEGRAM_BOT_TOKEN=<your bot token>` (required)
+   - `TASKBOT_USER_MAPPING_JSON={"<telegram_user_id>":"<hubstaff_user_id>"}` (optional, only needed if you use per-user mapping)
+2. Trigger **Actions → Hubstaff Tasks Bot** (workflows are enabled by default unless disabled in repo settings).
+3. The workflow runs every 30 minutes and can also be started manually.
+
 ### Task bot commands
 
 ```text
