@@ -37,38 +37,30 @@ class TelegramTaskBot:
         logger.info("Starting Hubstaff Telegram task bot (polling mode)")
         while True:
             try:
-                updates = self._get_updates()
-                for update in updates:
-                    update_id = int(update.get("update_id", 0))
-                    self._offset = max(self._offset, update_id + 1)
-                    self._state.set_last_update_id(update_id)
-                    self._handle_update(update)
+                updates = self._get_updates_with_conflict_recovery()
+                if updates is None:
+                    time.sleep(max(self._poll_interval, 1))
+                    continue
+                self._process_updates(updates)
             except Exception as exc:
                 logger.error("Task bot loop error: %s", exc)
                 time.sleep(max(self._poll_interval, 1))
 
     def run_once(self) -> int:
         try:
-            updates = self._get_updates()
+            updates = self._get_updates_with_conflict_recovery()
         except requests.HTTPError as exc:
-            if exc.response is not None and exc.response.status_code == 409:
-                logger.warning(
-                    "Task bot run_once skipped: Telegram getUpdates conflict (409). "
-                    "Another poller may already be running."
-                )
-                return 0
             logger.error("Task bot run_once failed during getUpdates: %s", exc)
             return 1
         except Exception as exc:
             logger.error("Task bot run_once failed before update processing: %s", exc)
             return 1
 
+        if updates is None:
+            return 0
+
         try:
-            for update in updates:
-                update_id = int(update.get("update_id", 0))
-                self._offset = max(self._offset, update_id + 1)
-                self._state.set_last_update_id(update_id)
-                self._handle_update(update)
+            self._process_updates(updates)
             return 0
         except Exception as exc:
             logger.error("Task bot run_once failed while processing updates: %s", exc)
@@ -152,3 +144,52 @@ class TelegramTaskBot:
             json={"callback_query_id": callback_query_id},
             timeout=10,
         )
+
+    def _process_updates(self, updates: list[dict[str, Any]]) -> None:
+        for update in updates:
+            update_id = int(update.get("update_id", 0))
+            self._offset = max(self._offset, update_id + 1)
+            self._state.set_last_update_id(update_id)
+            self._handle_update(update)
+
+    def _get_updates_with_conflict_recovery(self) -> list[dict[str, Any]] | None:
+        try:
+            return self._get_updates()
+        except requests.HTTPError as exc:
+            if exc.response is None or exc.response.status_code != 409:
+                raise
+            return self._recover_updates_after_conflict()
+
+    def _recover_updates_after_conflict(self) -> list[dict[str, Any]] | None:
+        logger.warning(
+            "Task bot getUpdates conflict (409). "
+            "Attempting webhook reset fallback."
+        )
+        if not self._delete_webhook():
+            logger.warning(
+                "Task bot fallback failed: webhook reset did not succeed. "
+                "Another poller may already be running."
+            )
+            return None
+        try:
+            updates = self._get_updates()
+            logger.info("Task bot recovered from Telegram conflict via deleteWebhook fallback.")
+            return updates
+        except requests.HTTPError as exc:
+            if exc.response is not None and exc.response.status_code == 409:
+                logger.warning(
+                    "Task bot getUpdates conflict (409) "
+                    "after webhook reset fallback. Another poller may already be running."
+                )
+                return None
+            raise
+
+    def _delete_webhook(self) -> bool:
+        response = requests.post(
+            f"{self._base_url}/deleteWebhook",
+            json={"drop_pending_updates": False},
+            timeout=10,
+        )
+        response.raise_for_status()
+        payload = response.json()
+        return bool(payload.get("ok"))
