@@ -205,11 +205,13 @@ class TelegramClient:
         self,
         summary: RunSummary,
         sources_checked: str,
+        flagged_url_details: Optional[list[tuple[str, str]]] = None,
     ) -> bool:
         """Send a run summary message."""
         text = self._build_summary_text(
             summary,
             sources_checked,
+            flagged_url_details=flagged_url_details,
             include_scan_date=False,
             include_flag_removal=False,
         )
@@ -220,11 +222,13 @@ class TelegramClient:
         self,
         summary: RunSummary,
         sources_checked: str,
+        flagged_url_details: Optional[list[tuple[str, str]]] = None,
     ) -> bool:
         """Send an enhanced run summary with explicit scan date and action link."""
         text = self._build_summary_text(
             summary,
             sources_checked,
+            flagged_url_details=flagged_url_details,
             include_scan_date=True,
             include_flag_removal=True,
         )
@@ -235,6 +239,7 @@ class TelegramClient:
         self,
         summary: RunSummary,
         sources_checked: str,
+        flagged_url_details: Optional[list[tuple[str, str]]] = None,
         *,
         include_scan_date: bool,
         include_flag_removal: bool,
@@ -264,6 +269,12 @@ class TelegramClient:
         )
         if include_flag_removal and flagged_urls > 0:
             text += f"\n- Request Flag Removal: {_TAKEDOWN_REQUEST_URL}"
+        if flagged_url_details:
+            flagged_lines = [
+                f"  • <code>{_escape(url)}</code> ({_escape(scanner)})"
+                for url, scanner in flagged_url_details
+            ]
+            text += "\n\n- Flagged URL Details:\n" + "\n".join(flagged_lines)
         return text
 
 

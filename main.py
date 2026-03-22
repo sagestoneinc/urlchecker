@@ -141,6 +141,7 @@ def run_scan(
     logger.info("Read %d URL(s) from %s", len(raw_urls), input_file)
 
     results: list[ScanResult] = []
+    flagged_url_details: list[tuple[str, str]] = []
     summary = RunSummary()
     has_errors = False
 
@@ -180,6 +181,7 @@ def run_scan(
             continue
 
         result = vt_client.scan_url(raw_url)
+        vt_verdict = result.verdict
         if urlscan_client:
             urlscan_result = urlscan_client.scan_url(raw_url)
             result.urlscan_io_uuid = urlscan_result.urlscan_io_uuid
@@ -197,6 +199,14 @@ def run_scan(
             ):
                 result.verdict = Verdict.SUSPICIOUS
         results.append(result)
+
+        if result.verdict in (Verdict.MALICIOUS, Verdict.SUSPICIOUS):
+            scanners: list[str] = []
+            if vt_verdict in (Verdict.MALICIOUS, Verdict.SUSPICIOUS):
+                scanners.append("VirusTotal")
+            if result.urlscan_io_verdict in (Verdict.MALICIOUS, Verdict.SUSPICIOUS):
+                scanners.append("URLScan.io")
+            flagged_url_details.append((result.normalized_url, ", ".join(scanners)))
 
         # Update summary counters
         if result.error and result.verdict == Verdict.UNKNOWN:
@@ -245,10 +255,7 @@ def run_scan(
     # Optional summary alert
     if send_summary and telegram and not dry_run:
         sources_checked = config.report_sources_checked
-        normalized_sources = [s.strip().lower() for s in sources_checked.split(",")]
-        if urlscan_client and "urlscan.io" not in normalized_sources:
-            sources_checked = f"{sources_checked}, URLScan.io"
-        telegram.send_summary(summary, sources_checked)
+        telegram.send_summary(summary, sources_checked, flagged_url_details)
 
     logger.info(
         "Run complete – total=%d malicious=%d suspicious=%d clean=%d "
