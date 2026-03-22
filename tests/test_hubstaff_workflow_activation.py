@@ -33,7 +33,7 @@ class HubstaffWorkflowActivationTests(unittest.TestCase):
         )
         self.assertIsNotNone(step_with_run)
 
-        env = step_with_run.get("env", {}) if isinstance(step_with_run, dict) else {}
+        env = step_with_run.get("env", {})
         self.assertEqual(env.get("ENABLE_HUBSTAFF_TASKS_BOT"), "true")
         self.assertEqual(env.get("HUBSTAFF_TOKEN"), "${{ secrets.HUBSTAFF_TOKEN }}")
         self.assertEqual(env.get("TELEGRAM_BOT_TOKEN"), "${{ secrets.TELEGRAM_BOT_TOKEN }}")
