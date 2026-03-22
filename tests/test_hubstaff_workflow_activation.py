@@ -17,10 +17,9 @@ class HubstaffWorkflowActivationTests(unittest.TestCase):
 
         jobs = workflow.get("jobs", {}) or {}
         task_bot = jobs.get("task-bot", {}) or {}
-        self.assertEqual(
-            task_bot.get("if"),
-            "${{ secrets.HUBSTAFF_TOKEN != '' && secrets.TELEGRAM_BOT_TOKEN != '' }}",
-        )
+        env = task_bot.get("env", {}) or {}
+        self.assertEqual(env.get("HUBSTAFF_TOKEN"), "${{ secrets.HUBSTAFF_TOKEN }}")
+        self.assertEqual(env.get("TELEGRAM_BOT_TOKEN"), "${{ secrets.TELEGRAM_BOT_TOKEN }}")
 
         steps = task_bot.get("steps", []) or []
         step_with_run = next(
@@ -32,11 +31,13 @@ class HubstaffWorkflowActivationTests(unittest.TestCase):
             None,
         )
         self.assertIsNotNone(step_with_run)
+        self.assertEqual(
+            step_with_run.get("if"),
+            "${{ env.HUBSTAFF_TOKEN != '' && env.TELEGRAM_BOT_TOKEN != '' }}",
+        )
 
         env = step_with_run.get("env", {})
         self.assertEqual(env.get("ENABLE_HUBSTAFF_TASKS_BOT"), "true")
-        self.assertEqual(env.get("HUBSTAFF_TOKEN"), "${{ secrets.HUBSTAFF_TOKEN }}")
-        self.assertEqual(env.get("TELEGRAM_BOT_TOKEN"), "${{ secrets.TELEGRAM_BOT_TOKEN }}")
         self.assertEqual(
             env.get("TASKBOT_USER_MAPPING_JSON"),
             "${{ secrets.TASKBOT_USER_MAPPING_JSON }}",
