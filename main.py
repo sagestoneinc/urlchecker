@@ -186,6 +186,7 @@ def run_scan(
             result.urlscan_io_verdict = urlscan_result.urlscan_io_verdict
             result.urlscan_io_malicious = urlscan_result.urlscan_io_malicious
             result.urlscan_io_suspicious = urlscan_result.urlscan_io_suspicious
+            result.total_engines += 1
             result.malicious_count += urlscan_result.urlscan_io_malicious
             result.suspicious_count += urlscan_result.urlscan_io_suspicious
             if result.urlscan_io_verdict == Verdict.MALICIOUS:
@@ -195,12 +196,6 @@ def run_scan(
                 and result.verdict != Verdict.MALICIOUS
             ):
                 result.verdict = Verdict.SUSPICIOUS
-            if result.urlscan_io_verdict in (
-                Verdict.MALICIOUS,
-                Verdict.SUSPICIOUS,
-                Verdict.CLEAN,
-            ):
-                result.total_engines += 1
         results.append(result)
 
         # Update summary counters
@@ -250,7 +245,8 @@ def run_scan(
     # Optional summary alert
     if send_summary and telegram and not dry_run:
         sources_checked = config.report_sources_checked
-        if urlscan_client and "urlscan.io" not in sources_checked.lower():
+        normalized_sources = [s.strip().lower() for s in sources_checked.split(",")]
+        if urlscan_client and "urlscan.io" not in normalized_sources:
             sources_checked = f"{sources_checked}, URLScan.io"
         telegram.send_summary(summary, sources_checked)
 

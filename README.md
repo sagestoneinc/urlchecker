@@ -104,6 +104,7 @@ Go to **Settings → Secrets and variables → Actions** and add:
 | Secret | Required | Description |
 |--------|----------|-------------|
 | `VT_API_KEY` | ✅ | Your VirusTotal API key |
+| `URLSCAN_IO_API_KEY` | Optional | Your URLScan.io API key (used when enabled) |
 | `TELEGRAM_BOT_TOKEN` | Optional | Your Telegram bot token (create via [@BotFather](https://t.me/BotFather)) |
 | `TELEGRAM_CHAT_ID` | Optional | The chat / channel ID to send alerts to |
 
@@ -157,6 +158,9 @@ cp .env.example .env
 
 # Load .env automatically (python-dotenv is included)
 python main.py --run-once
+
+# Enable URLScan.io as a secondary scanner
+ENABLE_URLSCAN_IO=true URLSCAN_IO_API_KEY=your_key python main.py --run-once
 
 # Specify a custom URL file
 python main.py --run-once --input my_urls.txt

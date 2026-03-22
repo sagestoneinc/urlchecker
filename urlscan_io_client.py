@@ -17,6 +17,7 @@ from utils import extract_domain, normalize_url
 logger = logging.getLogger(__name__)
 
 _URLSCAN_BASE = "https://urlscan.io/api/v1"
+_SUSPICIOUS_SCORE_THRESHOLD = 0
 
 
 def _build_session(config: Config) -> requests.Session:
@@ -64,8 +65,9 @@ class URLScanIOClient:
     def __init__(self, config: Config) -> None:
         self._config = config
         self._session = _build_session(config)
-        # urlscan.io public API is restrictive; stay conservative.
-        self._limiter = RateLimiter(requests_per_second=2)
+        self._limiter = RateLimiter(
+            requests_per_second=config.urlscan_io_requests_per_second
+        )
 
     def _get(self, path: str) -> dict[str, Any]:
         self._limiter.wait()
@@ -87,7 +89,10 @@ class URLScanIOClient:
 
     def submit_url(self, url: str) -> str:
         """Submit URL and return scan UUID."""
-        response = self._post("/scan/", {"url": url, "visibility": "unlisted"})
+        response = self._post(
+            "/scan/",
+            {"url": url, "visibility": self._config.urlscan_io_visibility},
+        )
         uuid = response.get("uuid", "")
         if not uuid:
             raise ValueError("URLScan submission did not return uuid")
@@ -136,7 +141,7 @@ class URLScanIOClient:
             suspicious = 0
             if overall.get("malicious"):
                 malicious = 1
-            elif overall.get("score", 0) > 0:
+            elif overall.get("score", 0) > _SUSPICIOUS_SCORE_THRESHOLD:
                 suspicious = 1
             result.urlscan_io_malicious = malicious
             result.urlscan_io_suspicious = suspicious

@@ -48,11 +48,18 @@ class Config:
 
     # VirusTotal
     vt_api_key: str = field(default_factory=lambda: _require_env("VT_API_KEY"))
+    # URLScan.io (optional secondary scanner)
     urlscan_io_api_key: str = field(
         default_factory=lambda: _optional_env("URLSCAN_IO_API_KEY")
     )
     enable_urlscan_io: bool = field(
         default_factory=lambda: _optional_bool("ENABLE_URLSCAN_IO", "false")
+    )
+    urlscan_io_requests_per_second: int = field(
+        default_factory=lambda: _optional_int("URLSCAN_IO_RPS", "2")
+    )
+    urlscan_io_visibility: str = field(
+        default_factory=lambda: _optional_env("URLSCAN_IO_VISIBILITY", "unlisted")
     )
 
     # Telegram (optional – alerts are skipped when not configured)
