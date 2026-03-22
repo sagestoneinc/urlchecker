@@ -66,6 +66,16 @@ class VirusTotalClient:
         self._config = config
         self._session = _build_session(config)
         self._limiter = RateLimiter(config.rate_limit_requests_per_minute)
+        self._using_backup_api_key = False
+
+    def _switch_to_backup_api_key(self) -> bool:
+        backup_api_key = self._config.vt_api_key_backup
+        if self._using_backup_api_key or not backup_api_key:
+            return False
+        self._session.headers.update({"x-apikey": backup_api_key})
+        self._using_backup_api_key = True
+        logger.warning("Primary VirusTotal API key hit rate/usage limits; switching to backup API key")
+        return True
 
     # ------------------------------------------------------------------
     # Internal helpers
@@ -76,7 +86,15 @@ class VirusTotalClient:
         self._limiter.wait()
         url = f"{_VT_BASE}{path}"
         resp = self._session.get(url, timeout=self._config.request_timeout_seconds)
-        resp.raise_for_status()
+        try:
+            resp.raise_for_status()
+        except requests.HTTPError:
+            if resp.status_code == 429 and self._switch_to_backup_api_key():
+                self._limiter.wait()
+                resp = self._session.get(url, timeout=self._config.request_timeout_seconds)
+                resp.raise_for_status()
+            else:
+                raise
         return resp.json()
 
     def _post(self, path: str, data: dict) -> dict[str, Any]:
@@ -86,7 +104,17 @@ class VirusTotalClient:
         resp = self._session.post(
             url, data=data, timeout=self._config.request_timeout_seconds
         )
-        resp.raise_for_status()
+        try:
+            resp.raise_for_status()
+        except requests.HTTPError:
+            if resp.status_code == 429 and self._switch_to_backup_api_key():
+                self._limiter.wait()
+                resp = self._session.post(
+                    url, data=data, timeout=self._config.request_timeout_seconds
+                )
+                resp.raise_for_status()
+            else:
+                raise
         return resp.json()
 
     # ------------------------------------------------------------------

@@ -103,7 +103,8 @@ Go to **Settings → Secrets and variables → Actions** and add:
 
 | Secret | Required | Description |
 |--------|----------|-------------|
-| `VT_API_KEY` | ✅ | Your VirusTotal API key |
+| `VT_API_KEY` | ✅ | Your primary VirusTotal API key |
+| `VT_API_KEY_BACKUP` | Optional | Backup VirusTotal API key used if primary key hits 429 limits |
 | `URLSCAN_IO_API_KEY` | Optional | Your URLScan.io API key (used when enabled) |
 | `ENABLE_SUCURI_SITECHECK` | Optional | Enable Sucuri SiteCheck scanner (`true`/`false`) |
 | `ENABLE_CLOUDFLARE_RADAR_URL_SCANNER` | Optional | Enable Cloudflare Radar URL Scanner (`true`/`false`) |
