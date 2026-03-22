@@ -72,6 +72,12 @@ class ScanResult:
     # VirusTotal analysis ID (used for polling)
     analysis_id: Optional[str] = None
 
+    # URLScan.io analysis details (optional)
+    urlscan_io_uuid: Optional[str] = None
+    urlscan_io_verdict: Optional[Verdict] = None
+    urlscan_io_malicious: int = 0
+    urlscan_io_suspicious: int = 0
+
     # Error info if scan failed
     error: Optional[str] = None
 
@@ -90,6 +96,12 @@ class ScanResult:
             "total_engines": self.total_engines,
             "verdict": self.verdict.value,
             "analysis_id": self.analysis_id,
+            "urlscan_io_uuid": self.urlscan_io_uuid,
+            "urlscan_io_verdict": (
+                self.urlscan_io_verdict.value if self.urlscan_io_verdict else None
+            ),
+            "urlscan_io_malicious": self.urlscan_io_malicious,
+            "urlscan_io_suspicious": self.urlscan_io_suspicious,
             "error": self.error,
             "domain_info": None,
         }
@@ -136,6 +148,14 @@ class ScanResult:
             verdict=Verdict(data.get("verdict", Verdict.UNKNOWN.value)),
             domain_result=domain_result,
             analysis_id=data.get("analysis_id"),
+            urlscan_io_uuid=data.get("urlscan_io_uuid"),
+            urlscan_io_verdict=(
+                Verdict(data["urlscan_io_verdict"])
+                if data.get("urlscan_io_verdict")
+                else None
+            ),
+            urlscan_io_malicious=data.get("urlscan_io_malicious", 0),
+            urlscan_io_suspicious=data.get("urlscan_io_suspicious", 0),
             error=data.get("error"),
         )
 
