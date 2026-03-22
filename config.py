@@ -48,6 +48,9 @@ class Config:
 
     # VirusTotal
     vt_api_key: str = field(default_factory=lambda: _require_env("VT_API_KEY"))
+    vt_api_key_backup: str = field(
+        default_factory=lambda: _optional_env("VT_API_KEY_BACKUP")
+    )
     # URLScan.io (optional secondary scanner)
     urlscan_io_api_key: str = field(
         default_factory=lambda: _optional_env("URLSCAN_IO_API_KEY")
