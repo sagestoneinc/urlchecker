@@ -18,6 +18,7 @@ from utils import extract_domain, normalize_url, vt_url_id
 logger = logging.getLogger(__name__)
 
 _VT_BASE = "https://www.virustotal.com/api/v3"
+_VT_APIKEY_HEADER = "x-apikey"
 
 
 def _build_session(config: Config) -> requests.Session:
@@ -36,7 +37,7 @@ def _build_session(config: Config) -> requests.Session:
     # Set auth header – value is never logged
     session.headers.update(
         {
-            "x-apikey": config.vt_api_key,
+            _VT_APIKEY_HEADER: config.vt_api_key,
             "Accept": "application/json",
         }
     )
@@ -58,6 +59,9 @@ class RateLimiter:
             time.sleep(sleep_for)
         self._last_call = time.monotonic()
 
+    def reset(self) -> None:
+        self._last_call = 0.0
+
 
 class VirusTotalClient:
     """Client for VirusTotal API v3."""
@@ -72,10 +76,31 @@ class VirusTotalClient:
         backup_api_key = self._config.vt_api_key_backup
         if self._using_backup_api_key or not backup_api_key:
             return False
-        self._session.headers.update({"x-apikey": backup_api_key})
+        self._session.headers.update({_VT_APIKEY_HEADER: backup_api_key})
         self._using_backup_api_key = True
-        logger.warning("Primary VirusTotal API key hit rate/usage limits; switching to backup API key")
+        self._limiter.reset()
+        logger.warning("Primary VirusTotal API key hit rate limits; switching to backup API key")
         return True
+
+    def _request_with_backup_fallback(self, method: str, path: str, **kwargs: Any) -> requests.Response:
+        self._limiter.wait()
+        url = f"{_VT_BASE}{path}"
+        request_method = getattr(self._session, method)
+        resp = request_method(url, timeout=self._config.request_timeout_seconds, **kwargs)
+        try:
+            resp.raise_for_status()
+        except requests.HTTPError:
+            if resp.status_code == 429 and self._switch_to_backup_api_key():
+                self._limiter.wait()
+                resp = request_method(
+                    url,
+                    timeout=self._config.request_timeout_seconds,
+                    **kwargs,
+                )
+                resp.raise_for_status()
+            else:
+                raise
+        return resp
 
     # ------------------------------------------------------------------
     # Internal helpers
@@ -83,38 +108,12 @@ class VirusTotalClient:
 
     def _get(self, path: str) -> dict[str, Any]:
         """Perform a rate-limited GET request and return parsed JSON."""
-        self._limiter.wait()
-        url = f"{_VT_BASE}{path}"
-        resp = self._session.get(url, timeout=self._config.request_timeout_seconds)
-        try:
-            resp.raise_for_status()
-        except requests.HTTPError:
-            if resp.status_code == 429 and self._switch_to_backup_api_key():
-                self._limiter.wait()
-                resp = self._session.get(url, timeout=self._config.request_timeout_seconds)
-                resp.raise_for_status()
-            else:
-                raise
+        resp = self._request_with_backup_fallback("get", path)
         return resp.json()
 
     def _post(self, path: str, data: dict) -> dict[str, Any]:
         """Perform a rate-limited POST request and return parsed JSON."""
-        self._limiter.wait()
-        url = f"{_VT_BASE}{path}"
-        resp = self._session.post(
-            url, data=data, timeout=self._config.request_timeout_seconds
-        )
-        try:
-            resp.raise_for_status()
-        except requests.HTTPError:
-            if resp.status_code == 429 and self._switch_to_backup_api_key():
-                self._limiter.wait()
-                resp = self._session.post(
-                    url, data=data, timeout=self._config.request_timeout_seconds
-                )
-                resp.raise_for_status()
-            else:
-                raise
+        resp = self._request_with_backup_fallback("post", path, data=data)
         return resp.json()
 
     # ------------------------------------------------------------------

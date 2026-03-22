@@ -27,12 +27,11 @@ class VirusTotalBackupKeyTests(unittest.TestCase):
         second = Mock()
         second.raise_for_status.return_value = None
         second.json.return_value = {"data": {"id": "analysis-id"}}
-        client._session.post = Mock(side_effect=[first, second])
-
-        result = client.submit_url("https://example.com")
+        with patch.object(client._session, "post", side_effect=[first, second]) as post_mock:
+            result = client.submit_url("https://example.com")
 
         self.assertEqual(result, "analysis-id")
-        self.assertEqual(client._session.post.call_count, 2)
+        self.assertEqual(post_mock.call_count, 2)
         self.assertEqual(client._session.headers["x-apikey"], "backup-key")
 
     def test_no_backup_key_keeps_original_error(self) -> None:
@@ -50,12 +49,11 @@ class VirusTotalBackupKeyTests(unittest.TestCase):
         failure = Mock()
         failure.status_code = 429
         failure.raise_for_status.side_effect = requests.HTTPError(response=failure)
-        client._session.get = Mock(return_value=failure)
-
-        with self.assertRaises(requests.HTTPError):
-            client._get("/urls/test")
+        with patch.object(client._session, "get", return_value=failure) as get_mock:
+            with self.assertRaises(requests.HTTPError):
+                client._get("/urls/test")
         self.assertEqual(client._session.headers["x-apikey"], "primary-key")
-        self.assertEqual(client._session.get.call_count, 1)
+        self.assertEqual(get_mock.call_count, 1)
 
 
 if __name__ == "__main__":
