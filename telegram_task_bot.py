@@ -49,13 +49,19 @@ class TelegramTaskBot:
     def run_once(self) -> int:
         try:
             updates = self._get_updates_with_conflict_recovery()
-            if updates is None:
-                return 0
-            self._process_updates(updates)
-            return 0
         except requests.HTTPError as exc:
             logger.error("Task bot run_once failed during getUpdates: %s", exc)
             return 1
+        except Exception as exc:
+            logger.error("Task bot run_once failed before update processing: %s", exc)
+            return 1
+
+        if updates is None:
+            return 0
+
+        try:
+            self._process_updates(updates)
+            return 0
         except Exception as exc:
             logger.error("Task bot run_once failed while processing updates: %s", exc)
             return 1

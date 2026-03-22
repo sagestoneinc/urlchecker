@@ -367,6 +367,28 @@ class HubstaffFeatureTests(unittest.TestCase):
             self.assertEqual(bot._get_updates.call_count, 2)
             self.assertEqual(store.last_update_id(), 42)
 
+    def test_task_bot_run_once_logs_processing_http_error_separately(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            store = TaskStateStore(Path(tmp) / "state.json")
+            bot = TelegramTaskBot(
+                bot_token="token",
+                handlers=self.FakeHandlers(),  # type: ignore[arg-type]
+                state_store=store,
+                poll_timeout_seconds=1,
+                poll_interval_seconds=1,
+            )
+
+            bot._get_updates = Mock(return_value=[])  # type: ignore[assignment]
+            bot._process_updates = Mock(side_effect=requests.HTTPError("send failed"))  # type: ignore[assignment]
+
+            with self.assertLogs("telegram_task_bot", level="ERROR") as captured:
+                exit_code = bot.run_once()
+
+            self.assertEqual(exit_code, 1)
+            self.assertTrue(
+                any("failed while processing updates" in line for line in captured.output)
+            )
+
 
 if __name__ == "__main__":
     unittest.main()
