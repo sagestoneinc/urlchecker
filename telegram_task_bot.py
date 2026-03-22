@@ -49,14 +49,29 @@ class TelegramTaskBot:
 
     def run_once(self) -> int:
         try:
-            for update in self._get_updates():
+            updates = self._get_updates()
+        except requests.HTTPError as exc:
+            if exc.response is not None and exc.response.status_code == 409:
+                logger.warning(
+                    "Task bot run_once skipped: Telegram getUpdates conflict (409). "
+                    "Another poller may already be running."
+                )
+                return 0
+            logger.error("Task bot run_once failed during getUpdates: %s", exc)
+            return 1
+        except Exception as exc:
+            logger.error("Task bot run_once failed before update processing: %s", exc)
+            return 1
+
+        try:
+            for update in updates:
                 update_id = int(update.get("update_id", 0))
                 self._offset = max(self._offset, update_id + 1)
                 self._state.set_last_update_id(update_id)
                 self._handle_update(update)
             return 0
         except Exception as exc:
-            logger.error("Task bot run_once failed: %s", exc)
+            logger.error("Task bot run_once failed while processing updates: %s", exc)
             return 1
 
     def _get_updates(self) -> list[dict[str, Any]]:
