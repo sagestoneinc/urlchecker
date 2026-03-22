@@ -55,6 +55,27 @@ class RegressionCompatibilityTests(unittest.TestCase):
         self.assertIn("Sources Checked", text)
         self.assertIn("Request Flag Removal", text)
 
+    def test_telegram_summary_flagged_details_are_truncated_to_fit_limit(self) -> None:
+        client = TelegramClient("token", "chat")
+        summary = RunSummary(total=200, malicious=200, suspicious=0)
+        flagged_url_details = [
+            (
+                f"https://example{i:03d}.very-long-domain-name-for-telegram-summary-limit-test.example/path/segment/extra",
+                "VirusTotal, URLScan.io, Sucuri SiteCheck, Cloudflare Radar URL Scanner",
+            )
+            for i in range(1, 200)
+        ]
+        text = client._build_summary_text(
+            summary,
+            "VirusTotal, URLScan.io, Sucuri SiteCheck, Cloudflare Radar URL Scanner",
+            flagged_url_details=flagged_url_details,
+            include_scan_date=False,
+            include_flag_removal=False,
+        )
+        self.assertLessEqual(len(text), 4096)
+        self.assertIn("Flagged URL Details", text)
+        self.assertIn("…and", text)
+
     def test_issue_comment_commands_workflow_contains_expected_commands(self) -> None:
         workflow = (self._REPO_ROOT / ".github/workflows/url-bot-commands.yml").read_text(
             encoding="utf-8"

@@ -17,7 +17,9 @@ except ImportError:
     pass  # python-dotenv is listed in requirements.txt; this is a safety guard
 
 from config import Config
+from cloudflare_radar_client import CloudflareRadarURLScannerClient
 from models import RunSummary, ScanResult, Verdict
+from sucuri_sitecheck_client import SucuriSiteCheckClient
 from storage import Storage
 from telegram_client import TelegramClient
 from urlscan_io_client import URLScanIOClient
@@ -115,6 +117,14 @@ def run_scan(
     if config.enable_urlscan_io and config.urlscan_io_api_key:
         urlscan_client = URLScanIOClient(config)
         logger.info("URLScan.io scanner enabled")
+    sucuri_client: Optional[SucuriSiteCheckClient] = None
+    if config.enable_sucuri_sitecheck:
+        sucuri_client = SucuriSiteCheckClient(config)
+        logger.info("Sucuri SiteCheck scanner enabled")
+    cloudflare_client: Optional[CloudflareRadarURLScannerClient] = None
+    if config.enable_cloudflare_radar_url_scanner:
+        cloudflare_client = CloudflareRadarURLScannerClient(config)
+        logger.info("Cloudflare Radar URL scanner enabled")
     telegram: Optional[TelegramClient] = None
     if config.telegram_enabled:
         telegram = TelegramClient(config.telegram_bot_token, config.telegram_chat_id)
@@ -141,6 +151,7 @@ def run_scan(
     logger.info("Read %d URL(s) from %s", len(raw_urls), input_file)
 
     results: list[ScanResult] = []
+    flagged_url_details: list[tuple[str, str]] = []
     summary = RunSummary()
     has_errors = False
 
@@ -180,6 +191,7 @@ def run_scan(
             continue
 
         result = vt_client.scan_url(raw_url)
+        vt_verdict = result.verdict
         if urlscan_client:
             urlscan_result = urlscan_client.scan_url(raw_url)
             result.urlscan_io_uuid = urlscan_result.urlscan_io_uuid
@@ -196,7 +208,43 @@ def run_scan(
                 and result.verdict != Verdict.MALICIOUS
             ):
                 result.verdict = Verdict.SUSPICIOUS
+        if sucuri_client:
+            sucuri_result = sucuri_client.scan_url(raw_url)
+            result.sucuri_sitecheck_verdict = sucuri_result.sucuri_sitecheck_verdict
+            result.sucuri_sitecheck_malicious = sucuri_result.sucuri_sitecheck_malicious
+            result.sucuri_sitecheck_suspicious = sucuri_result.sucuri_sitecheck_suspicious
+            if result.sucuri_sitecheck_verdict == Verdict.MALICIOUS:
+                result.verdict = Verdict.MALICIOUS
+            elif (
+                result.sucuri_sitecheck_verdict == Verdict.SUSPICIOUS
+                and result.verdict != Verdict.MALICIOUS
+            ):
+                result.verdict = Verdict.SUSPICIOUS
+        if cloudflare_client:
+            cloudflare_result = cloudflare_client.scan_url(raw_url)
+            result.cloudflare_radar_verdict = cloudflare_result.cloudflare_radar_verdict
+            result.cloudflare_radar_malicious = cloudflare_result.cloudflare_radar_malicious
+            result.cloudflare_radar_suspicious = cloudflare_result.cloudflare_radar_suspicious
+            if result.cloudflare_radar_verdict == Verdict.MALICIOUS:
+                result.verdict = Verdict.MALICIOUS
+            elif (
+                result.cloudflare_radar_verdict == Verdict.SUSPICIOUS
+                and result.verdict != Verdict.MALICIOUS
+            ):
+                result.verdict = Verdict.SUSPICIOUS
         results.append(result)
+
+        if result.verdict in (Verdict.MALICIOUS, Verdict.SUSPICIOUS):
+            scanners: list[str] = []
+            if vt_verdict in (Verdict.MALICIOUS, Verdict.SUSPICIOUS):
+                scanners.append("VirusTotal")
+            if result.urlscan_io_verdict in (Verdict.MALICIOUS, Verdict.SUSPICIOUS):
+                scanners.append("URLScan.io")
+            if result.sucuri_sitecheck_verdict in (Verdict.MALICIOUS, Verdict.SUSPICIOUS):
+                scanners.append("Sucuri SiteCheck")
+            if result.cloudflare_radar_verdict in (Verdict.MALICIOUS, Verdict.SUSPICIOUS):
+                scanners.append("Cloudflare Radar URL Scanner")
+            flagged_url_details.append((result.normalized_url, ", ".join(scanners)))
 
         # Update summary counters
         if result.error and result.verdict == Verdict.UNKNOWN:
@@ -245,10 +293,7 @@ def run_scan(
     # Optional summary alert
     if send_summary and telegram and not dry_run:
         sources_checked = config.report_sources_checked
-        normalized_sources = [s.strip().lower() for s in sources_checked.split(",")]
-        if urlscan_client and "urlscan.io" not in normalized_sources:
-            sources_checked = f"{sources_checked}, URLScan.io"
-        telegram.send_summary(summary, sources_checked)
+        telegram.send_summary(summary, sources_checked, flagged_url_details)
 
     logger.info(
         "Run complete – total=%d malicious=%d suspicious=%d clean=%d "
