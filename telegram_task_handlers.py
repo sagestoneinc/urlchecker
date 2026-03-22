@@ -54,7 +54,9 @@ class TelegramTaskHandlers:
         command = command.lower()
 
         if command in {"/start", "/help"}:
-            return HandlerResponse(text=self._help_text())
+            return self._help_response()
+        if command in {"/menu", "/hubstaff", "/hubspot"}:
+            return self._quick_actions_response()
         if command == "/tasks":
             return self._handle_list_tasks(telegram_user_id=telegram_user_id, args=args)
         if command == "/task":
@@ -72,6 +74,19 @@ class TelegramTaskHandlers:
         return HandlerResponse(text="Unknown command. Use /help.")
 
     def handle_callback_query(self, *, telegram_user_id: str, chat_id: str, data: str) -> HandlerResponse:
+        if data == "cmd:help":
+            return self._help_response()
+        if data.startswith("cmd:tasks:"):
+            preset = data.split(":", 2)[2]
+            return self._handle_list_tasks(telegram_user_id=telegram_user_id, args=preset)
+        if data == "cmd:reminders":
+            return self._handle_list_reminders(telegram_user_id)
+        if data == "cmd:remind_due_today":
+            return self._handle_remind(
+                telegram_user_id=telegram_user_id,
+                chat_id=chat_id,
+                args="subscribe due_today",
+            )
         if data.startswith("task:"):
             task_id = data.split(":", 1)[1]
             return self._handle_task_detail(task_id)
@@ -90,6 +105,8 @@ class TelegramTaskHandlers:
     def _help_text(self) -> str:
         return (
             "Hubstaff Task Bot commands:\n"
+            "/menu (show quick action buttons)\n"
+            "/hubstaff or /hubspot (aliases for /menu)\n"
             "/tasks [mine|open|overdue|today|week] [project=<id>] [assignee=<id>] [label=<text>] [status=<id>] [q=<text>]\n"
             "/task <task_id>\n"
             "/assign <task_id> <user query or user_id>\n"
@@ -101,12 +118,57 @@ class TelegramTaskHandlers:
             "/reminders"
         )
 
+    def _help_response(self) -> HandlerResponse:
+        return HandlerResponse(
+            text=self._help_text(),
+            reply_markup=self._quick_actions_markup(),
+        )
+
+    def _quick_actions_response(self) -> HandlerResponse:
+        return HandlerResponse(
+            text=(
+                "Quick actions:\n"
+                "Use the buttons below for common Hubstaff commands."
+            ),
+            reply_markup=self._quick_actions_markup(),
+        )
+
+    @staticmethod
+    def _quick_actions_markup() -> dict[str, list[list[dict[str, str]]]]:
+        return {
+            "inline_keyboard": [
+                [
+                    {"text": "My tasks", "callback_data": "cmd:tasks:mine"},
+                    {"text": "Open", "callback_data": "cmd:tasks:open"},
+                ],
+                [
+                    {"text": "Due today", "callback_data": "cmd:tasks:today"},
+                    {"text": "Overdue", "callback_data": "cmd:tasks:overdue"},
+                ],
+                [
+                    {"text": "My reminders", "callback_data": "cmd:reminders"},
+                    {"text": "Remind due today", "callback_data": "cmd:remind_due_today"},
+                ],
+                [
+                    {"text": "Show commands", "callback_data": "cmd:help"},
+                ],
+            ]
+        }
+
     def _handle_list_tasks(self, *, telegram_user_id: str, args: str) -> HandlerResponse:
         filters = self._parse_task_filters(args)
         if filters.pop("mine", False):
             mapped = self._state.hubstaff_user_id_for(telegram_user_id)
             if mapped:
                 filters["assignee_id"] = mapped
+            else:
+                return HandlerResponse(
+                    text=(
+                        "Can't run 'My tasks' yet because your Telegram account isn't mapped to a Hubstaff user. "
+                        "Set TASKBOT_USER_MAPPING_JSON with your Telegram user id to Hubstaff user id mapping, "
+                        "or run /tasks assignee=<hubstaff_user_id>."
+                    )
+                )
         tasks = self._hubstaff.list_tasks(filters=filters)
         if not tasks:
             return HandlerResponse(text="No tasks found for the selected filters.")

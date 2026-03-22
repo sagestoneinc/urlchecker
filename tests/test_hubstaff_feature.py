@@ -156,6 +156,11 @@ class HubstaffFeatureTests(unittest.TestCase):
 
             help_text = handlers.handle_command(telegram_user_id="100", chat_id="200", text="/help")
             self.assertIn("timezone=America/New_York", help_text.text)
+            self.assertIsNotNone(help_text.reply_markup)
+
+            menu = handlers.handle_command(telegram_user_id="100", chat_id="200", text="/hubspot")
+            self.assertIn("Quick actions", menu.text)
+            self.assertIsNotNone(menu.reply_markup)
 
             # Pending edit should be preserved when issuing slash command
             still_editing = handlers.handle_command(telegram_user_id="100", chat_id="200", text="/task 1")
@@ -166,15 +171,57 @@ class HubstaffFeatureTests(unittest.TestCase):
             callback = handlers.handle_callback_query(telegram_user_id="100", chat_id="200", data="task:1")
             self.assertIn("Task #1", callback.text)
 
+            quick_list_callback = handlers.handle_callback_query(
+                telegram_user_id="100",
+                chat_id="200",
+                data="cmd:tasks:mine",
+            )
+            self.assertIn("Tasks:", quick_list_callback.text)
+
             subscribe_callback = handlers.handle_callback_query(
                 telegram_user_id="100",
                 chat_id="200",
                 data="remind:due_today",
             )
             self.assertIn("Subscribed to due_today reminders", subscribe_callback.text)
+
+            quick_subscribe_callback = handlers.handle_callback_query(
+                telegram_user_id="100",
+                chat_id="200",
+                data="cmd:remind_due_today",
+            )
+            self.assertIn("Subscribed to due_today reminders", quick_subscribe_callback.text)
             reminders = store.list_reminders()
             self.assertEqual(reminders[-1].chat_id, "200")
             self.assertEqual(reminders[-1].timezone, "America/New_York")
+
+    def test_handlers_mine_preset_requires_user_mapping(self) -> None:
+        class FakeHubstaff:
+            def list_tasks(self, filters=None, per_page=50):
+                raise AssertionError("list_tasks should not run without mapping for mine preset")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            store = TaskStateStore(Path(tmp) / "state.json")
+            handlers = TelegramTaskHandlers(
+                hubstaff_client=FakeHubstaff(),
+                state_store=store,
+            )
+
+            from_command = handlers.handle_command(
+                telegram_user_id="100",
+                chat_id="200",
+                text="/tasks mine",
+            )
+            self.assertIn("TASKBOT_USER_MAPPING_JSON", from_command.text)
+            self.assertIn("/tasks assignee=<hubstaff_user_id>", from_command.text)
+
+            from_callback = handlers.handle_callback_query(
+                telegram_user_id="100",
+                chat_id="200",
+                data="cmd:tasks:mine",
+            )
+            self.assertIn("TASKBOT_USER_MAPPING_JSON", from_callback.text)
+            self.assertIn("/tasks assignee=<hubstaff_user_id>", from_callback.text)
 
     def test_reminder_engine_sends_due_today(self) -> None:
         class FakeHubstaff:
