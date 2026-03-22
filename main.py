@@ -213,9 +213,6 @@ def run_scan(
             result.sucuri_sitecheck_verdict = sucuri_result.sucuri_sitecheck_verdict
             result.sucuri_sitecheck_malicious = sucuri_result.sucuri_sitecheck_malicious
             result.sucuri_sitecheck_suspicious = sucuri_result.sucuri_sitecheck_suspicious
-            result.total_engines += 1
-            result.malicious_count += sucuri_result.sucuri_sitecheck_malicious
-            result.suspicious_count += sucuri_result.sucuri_sitecheck_suspicious
             if result.sucuri_sitecheck_verdict == Verdict.MALICIOUS:
                 result.verdict = Verdict.MALICIOUS
             elif (
@@ -228,9 +225,6 @@ def run_scan(
             result.cloudflare_radar_verdict = cloudflare_result.cloudflare_radar_verdict
             result.cloudflare_radar_malicious = cloudflare_result.cloudflare_radar_malicious
             result.cloudflare_radar_suspicious = cloudflare_result.cloudflare_radar_suspicious
-            result.total_engines += 1
-            result.malicious_count += cloudflare_result.cloudflare_radar_malicious
-            result.suspicious_count += cloudflare_result.cloudflare_radar_suspicious
             if result.cloudflare_radar_verdict == Verdict.MALICIOUS:
                 result.verdict = Verdict.MALICIOUS
             elif (

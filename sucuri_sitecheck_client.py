@@ -7,6 +7,8 @@ from typing import Any
 from urllib.parse import quote
 
 import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
 from config import Config
 from models import ScanResult, Verdict
@@ -17,13 +19,29 @@ logger = logging.getLogger(__name__)
 _SUCURI_BASE = "https://sitecheck.sucuri.net/api/v3"
 
 
+def _build_session(config: Config) -> requests.Session:
+    """Create a requests Session with retry logic."""
+    session = requests.Session()
+    retry = Retry(
+        total=config.max_retries,
+        backoff_factor=2,
+        status_forcelist=[429, 500, 502, 503, 504],
+        allowed_methods=["GET"],
+        raise_on_status=False,
+    )
+    adapter = HTTPAdapter(max_retries=retry)
+    session.mount("https://", adapter)
+    session.mount("http://", adapter)
+    session.headers.update({"Accept": "application/json"})
+    return session
+
+
 class SucuriSiteCheckClient:
     """Client for Sucuri SiteCheck URL scanner."""
 
     def __init__(self, config: Config) -> None:
         self._config = config
-        self._session = requests.Session()
-        self._session.headers.update({"Accept": "application/json"})
+        self._session = _build_session(config)
 
     def _get(self, url: str) -> dict[str, Any]:
         encoded = quote(url, safe="")

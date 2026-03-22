@@ -14,6 +14,9 @@ logger = logging.getLogger(__name__)
 
 _TELEGRAM_API = "https://api.telegram.org"
 _TAKEDOWN_REQUEST_URL = "https://www.virustotal.com/gui/contact-us"
+_TELEGRAM_MAX_MESSAGE_LENGTH = 4096
+_FLAGGED_DETAILS_HEADER = "\n\n- Flagged URL Details:\n"
+_FLAGGED_DETAILS_MORE_TEMPLATE = "  • …and {count} more flagged URL(s)"
 
 
 class TelegramClient:
@@ -270,11 +273,7 @@ class TelegramClient:
         if include_flag_removal and flagged_urls > 0:
             text += f"\n- Request Flag Removal: {_TAKEDOWN_REQUEST_URL}"
         if flagged_url_details:
-            flagged_lines = [
-                f"  • <code>{_escape(url)}</code> ({_escape(scanner)})"
-                for url, scanner in flagged_url_details
-            ]
-            text += "\n\n- Flagged URL Details:\n" + "\n".join(flagged_lines)
+            text = _append_flagged_url_details_with_limit(text, flagged_url_details)
         return text
 
 
@@ -285,3 +284,37 @@ def _escape(text: str) -> str:
         .replace("<", "&lt;")
         .replace(">", "&gt;")
     )
+
+
+def _append_flagged_url_details_with_limit(
+    text: str, flagged_url_details: list[tuple[str, str]]
+) -> str:
+    """Append flagged URL lines without exceeding Telegram message size limit."""
+    details_lines = [
+        f"  • <code>{_escape(url)}</code> ({_escape(scanner)})"
+        for url, scanner in flagged_url_details
+    ]
+    max_body_length = _TELEGRAM_MAX_MESSAGE_LENGTH
+    available = max_body_length - len(text) - len(_FLAGGED_DETAILS_HEADER)
+    if available <= 0:
+        return text
+    kept_lines: list[str] = []
+    used = 0
+    for idx, line in enumerate(details_lines):
+        sep_len = 1 if kept_lines else 0
+        remaining = len(details_lines) - idx - 1
+        more_line = (
+            _FLAGGED_DETAILS_MORE_TEMPLATE.format(count=remaining) if remaining > 0 else ""
+        )
+        more_len = (1 + len(more_line)) if more_line else 0
+        needed = used + sep_len + len(line) + more_len
+        if needed > available:
+            break
+        kept_lines.append(line)
+        used += sep_len + len(line)
+    if not kept_lines:
+        return text
+    remaining = len(details_lines) - len(kept_lines)
+    if remaining > 0:
+        kept_lines.append(_FLAGGED_DETAILS_MORE_TEMPLATE.format(count=remaining))
+    return text + _FLAGGED_DETAILS_HEADER + "\n".join(kept_lines)
