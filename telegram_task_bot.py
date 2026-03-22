@@ -56,8 +56,7 @@ class TelegramTaskBot:
                 self._handle_update(update)
             return 0
         except requests.HTTPError as exc:
-            status_code = exc.response.status_code if exc.response is not None else None
-            if status_code == 409:
+            if exc.response is not None and exc.response.status_code == 409:
                 logger.warning(
                     "Task bot run_once skipped: Telegram getUpdates conflict (409). "
                     "Another poller may already be running."

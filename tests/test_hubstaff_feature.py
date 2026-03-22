@@ -331,8 +331,8 @@ class HubstaffFeatureTests(unittest.TestCase):
 
             response = Mock()
             response.status_code = 409
-            bot._get_updates = lambda: (_ for _ in ()).throw(  # type: ignore[assignment]
-                requests.HTTPError("Conflict", response=response)
+            bot._get_updates = Mock(  # type: ignore[assignment]
+                side_effect=requests.HTTPError("Conflict", response=response)
             )
 
             exit_code = bot.run_once()
