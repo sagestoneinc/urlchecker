@@ -81,6 +81,26 @@ class HubstaffWorkflowActivationTests(unittest.TestCase):
         steps = task_bot.get("steps", [])
         self.assertTrue(any(step.get("run") == "python bot_entrypoint.py --run-once" for step in steps))
 
+    def test_all_workflows_use_node24_ready_checkout_and_setup_python(self) -> None:
+        workflow_paths = [
+            self._REPO_ROOT / ".github/workflows/hubstaff-task-bot.yml",
+            self._REPO_ROOT / ".github/workflows/daily-url-scan.yml",
+            self._REPO_ROOT / ".github/workflows/url-bot-commands.yml",
+        ]
+        for workflow_path in workflow_paths:
+            content = workflow_path.read_text(encoding="utf-8")
+            self.assertIn("actions/checkout@v5", content)
+            self.assertNotIn("actions/checkout@v4", content)
+
+        python_workflows = [
+            self._REPO_ROOT / ".github/workflows/hubstaff-task-bot.yml",
+            self._REPO_ROOT / ".github/workflows/daily-url-scan.yml",
+        ]
+        for workflow_path in python_workflows:
+            content = workflow_path.read_text(encoding="utf-8")
+            self.assertIn("actions/setup-python@v6", content)
+            self.assertNotIn("actions/setup-python@v5", content)
+
 
 if __name__ == "__main__":
     unittest.main()
