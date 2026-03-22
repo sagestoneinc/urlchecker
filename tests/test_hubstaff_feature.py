@@ -156,6 +156,11 @@ class HubstaffFeatureTests(unittest.TestCase):
 
             help_text = handlers.handle_command(telegram_user_id="100", chat_id="200", text="/help")
             self.assertIn("timezone=America/New_York", help_text.text)
+            self.assertIsNotNone(help_text.reply_markup)
+
+            menu = handlers.handle_command(telegram_user_id="100", chat_id="200", text="/hubspot")
+            self.assertIn("Quick actions", menu.text)
+            self.assertIsNotNone(menu.reply_markup)
 
             # Pending edit should be preserved when issuing slash command
             still_editing = handlers.handle_command(telegram_user_id="100", chat_id="200", text="/task 1")
@@ -166,12 +171,26 @@ class HubstaffFeatureTests(unittest.TestCase):
             callback = handlers.handle_callback_query(telegram_user_id="100", chat_id="200", data="task:1")
             self.assertIn("Task #1", callback.text)
 
+            quick_list_callback = handlers.handle_callback_query(
+                telegram_user_id="100",
+                chat_id="200",
+                data="cmd:tasks:mine",
+            )
+            self.assertIn("Tasks:", quick_list_callback.text)
+
             subscribe_callback = handlers.handle_callback_query(
                 telegram_user_id="100",
                 chat_id="200",
                 data="remind:due_today",
             )
             self.assertIn("Subscribed to due_today reminders", subscribe_callback.text)
+
+            quick_subscribe_callback = handlers.handle_callback_query(
+                telegram_user_id="100",
+                chat_id="200",
+                data="cmd:remind_due_today",
+            )
+            self.assertIn("Subscribed to due_today reminders", quick_subscribe_callback.text)
             reminders = store.list_reminders()
             self.assertEqual(reminders[-1].chat_id, "200")
             self.assertEqual(reminders[-1].timezone, "America/New_York")
