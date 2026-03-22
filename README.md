@@ -109,7 +109,7 @@ Go to **Settings → Secrets and variables → Actions** and add:
 | `ENABLE_SUCURI_SITECHECK` | Optional | Enable Sucuri SiteCheck scanner (`true`/`false`) |
 | `ENABLE_CLOUDFLARE_RADAR_URL_SCANNER` | Optional | Enable Cloudflare Radar URL Scanner (`true`/`false`) |
 | `TELEGRAM_BOT_TOKEN` | Optional | Your Telegram bot token (create via [@BotFather](https://t.me/BotFather)) |
-| `TELEGRAM_CHAT_ID` | Optional | The chat / channel ID to send alerts to |
+| `TELEGRAM_CHAT_ID` | Optional | Chat/channel ID(s) to send alerts to (comma-separated for multiple chats) |
 
 To get your Telegram chat ID:
 1. Start a conversation with your bot.

@@ -127,7 +127,10 @@ def run_scan(
         logger.info("Cloudflare Radar URL scanner enabled")
     telegram: Optional[TelegramClient] = None
     if config.telegram_enabled:
-        telegram = TelegramClient(config.telegram_bot_token, config.telegram_chat_id)
+        telegram = TelegramClient(
+            config.telegram_bot_token,
+            config.telegram_chat_ids,
+        )
     else:
         logger.warning(
             "Telegram is not configured – alerts will be logged only. "
