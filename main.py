@@ -20,6 +20,7 @@ from config import Config
 from models import RunSummary, ScanResult, Verdict
 from storage import Storage
 from telegram_client import TelegramClient
+from urlscan_io_client import URLScanIOClient
 from utils import (
     extract_domain,
     is_valid_url,
@@ -110,6 +111,10 @@ def run_scan(
     """
     storage = Storage(config.results_dir)
     vt_client = VirusTotalClient(config)
+    urlscan_client: Optional[URLScanIOClient] = None
+    if config.enable_urlscan_io and config.urlscan_io_api_key:
+        urlscan_client = URLScanIOClient(config)
+        logger.info("URLScan.io scanner enabled")
     telegram: Optional[TelegramClient] = None
     if config.telegram_enabled:
         telegram = TelegramClient(config.telegram_bot_token, config.telegram_chat_id)
@@ -175,6 +180,27 @@ def run_scan(
             continue
 
         result = vt_client.scan_url(raw_url)
+        if urlscan_client:
+            urlscan_result = urlscan_client.scan_url(raw_url)
+            result.urlscan_io_uuid = urlscan_result.urlscan_io_uuid
+            result.urlscan_io_verdict = urlscan_result.urlscan_io_verdict
+            result.urlscan_io_malicious = urlscan_result.urlscan_io_malicious
+            result.urlscan_io_suspicious = urlscan_result.urlscan_io_suspicious
+            result.malicious_count += urlscan_result.urlscan_io_malicious
+            result.suspicious_count += urlscan_result.urlscan_io_suspicious
+            if result.urlscan_io_verdict == Verdict.MALICIOUS:
+                result.verdict = Verdict.MALICIOUS
+            elif (
+                result.urlscan_io_verdict == Verdict.SUSPICIOUS
+                and result.verdict != Verdict.MALICIOUS
+            ):
+                result.verdict = Verdict.SUSPICIOUS
+            if result.urlscan_io_verdict in (
+                Verdict.MALICIOUS,
+                Verdict.SUSPICIOUS,
+                Verdict.CLEAN,
+            ):
+                result.total_engines += 1
         results.append(result)
 
         # Update summary counters
@@ -223,7 +249,10 @@ def run_scan(
 
     # Optional summary alert
     if send_summary and telegram and not dry_run:
-        telegram.send_summary(summary, config.report_sources_checked)
+        sources_checked = config.report_sources_checked
+        if urlscan_client and "urlscan.io" not in sources_checked.lower():
+            sources_checked = f"{sources_checked}, URLScan.io"
+        telegram.send_summary(summary, sources_checked)
 
     logger.info(
         "Run complete – total=%d malicious=%d suspicious=%d clean=%d "
