@@ -323,9 +323,45 @@ class HubstaffFeatureTests(unittest.TestCase):
             bot._get_updates = Mock(  # type: ignore[assignment]
                 side_effect=requests.HTTPError("Conflict", response=response)
             )
+            bot._delete_webhook = Mock(return_value=False)  # type: ignore[assignment]
 
             exit_code = bot.run_once()
             self.assertEqual(exit_code, 0)
+
+    def test_task_bot_run_once_recovers_conflict_via_delete_webhook(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            store = TaskStateStore(Path(tmp) / "state.json")
+            bot = TelegramTaskBot(
+                bot_token="token",
+                handlers=self.FakeHandlers(),  # type: ignore[arg-type]
+                state_store=store,
+                poll_timeout_seconds=1,
+                poll_interval_seconds=1,
+            )
+
+            conflict_response = Mock()
+            conflict_response.status_code = 409
+            bot._get_updates = Mock(  # type: ignore[assignment]
+                side_effect=[
+                    requests.HTTPError("Conflict", response=conflict_response),
+                    [
+                        {
+                            "update_id": 42,
+                            "message": {
+                                "text": "/help",
+                                "from": {"id": 100},
+                                "chat": {"id": 200},
+                            },
+                        }
+                    ],
+                ]
+            )
+            bot._delete_webhook = Mock(return_value=True)  # type: ignore[assignment]
+            bot._send_message = lambda **kwargs: None  # type: ignore[assignment]
+
+            exit_code = bot.run_once()
+            self.assertEqual(exit_code, 0)
+            self.assertEqual(store.last_update_id(), 42)
 
 
 if __name__ == "__main__":
