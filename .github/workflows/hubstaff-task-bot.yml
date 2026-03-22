@@ -13,7 +13,7 @@ concurrency:
   cancel-in-progress: true
 jobs:
   task-bot:
-    if: ${{ secrets.HUBSTAFF_TOKEN != '' && secrets.TELEGRAM_BOT_TOKEN != '' }}
+    if: ${{secrets.HUBSTAFF_TOKEN != '' && secrets.TELEGRAM_BOT_TOKEN != ''}}
     runs-on: ubuntu-latest
 
     steps:
@@ -32,7 +32,7 @@ jobs:
       - name: Run Hubstaff task bot once
         env:
           ENABLE_HUBSTAFF_TASKS_BOT: "true"
-          HUBSTAFF_TOKEN: ${{ secrets.HUBSTAFF_TOKEN }}
-          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          TASKBOT_USER_MAPPING_JSON: ${{ secrets.TASKBOT_USER_MAPPING_JSON }}
+          HUBSTAFF_TOKEN: ${{secrets.HUBSTAFF_TOKEN}}
+          TELEGRAM_BOT_TOKEN: ${{secrets.TELEGRAM_BOT_TOKEN}}
+          TASKBOT_USER_MAPPING_JSON: ${{secrets.TASKBOT_USER_MAPPING_JSON}}
         run: python bot_entrypoint.py --run-once
