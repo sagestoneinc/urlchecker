@@ -22,6 +22,20 @@ class HubstaffWorkflowActivationTests(unittest.TestCase):
         self.assertEqual(env.get("TELEGRAM_BOT_TOKEN"), "${{ secrets.TELEGRAM_BOT_TOKEN }}")
 
         steps = task_bot.get("steps", []) or []
+        checkout_step = next(
+            (step for step in steps if isinstance(step, dict) and step.get("name") == "Checkout repository"),
+            None,
+        )
+        self.assertIsNotNone(checkout_step)
+        self.assertEqual(checkout_step.get("uses"), "actions/checkout@v5")
+
+        setup_python_step = next(
+            (step for step in steps if isinstance(step, dict) and step.get("name") == "Set up Python 3.11"),
+            None,
+        )
+        self.assertIsNotNone(setup_python_step)
+        self.assertEqual(setup_python_step.get("uses"), "actions/setup-python@v6")
+
         step_with_run = next(
             (
                 step
