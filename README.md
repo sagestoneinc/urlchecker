@@ -200,8 +200,8 @@ python bot_entrypoint.py
 
 1. Add the required repository secret:
    - `HUBSTAFF_TOKEN=<your token>`
-2. Enable and trigger **Actions → Hubstaff Tasks Bot**.
-3. The workflow runs every 5 minutes and can also be started manually.
+2. Trigger **Actions → Hubstaff Tasks Bot** (workflows are enabled by default unless disabled in repo settings).
+3. The workflow runs every 30 minutes and can also be started manually.
 
 ### Task bot commands
 
