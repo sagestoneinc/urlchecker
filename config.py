@@ -169,7 +169,11 @@ class Config:
 
     @property
     def telegram_enabled(self) -> bool:
-        return bool(self.telegram_bot_token and self.telegram_chat_id)
+        return bool(self.telegram_bot_token and self.telegram_chat_ids)
+
+    @property
+    def telegram_chat_ids(self) -> list[str]:
+        return [item.strip() for item in self.telegram_chat_id.split(",") if item.strip()]
 
     @classmethod
     def from_env(cls) -> "Config":

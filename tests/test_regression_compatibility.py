@@ -108,6 +108,49 @@ class RegressionCompatibilityTests(unittest.TestCase):
             self.assertEqual(exit_code, 0)
             self.assertFalse((results_dir / "latest_results.json").exists())
 
+    def test_config_supports_multiple_telegram_chat_ids(self) -> None:
+        with patch.dict(
+            os.environ,
+            {
+                "VT_API_KEY": "dummy",
+                "TELEGRAM_BOT_TOKEN": "token",
+                "TELEGRAM_CHAT_ID": "1001, 1002 ,1003",
+            },
+            clear=False,
+        ):
+            config = Config.from_env()
+        self.assertEqual(config.telegram_chat_ids, ["1001", "1002", "1003"])
+        self.assertTrue(config.telegram_enabled)
+
+    def test_telegram_client_sends_message_to_all_chat_ids(self) -> None:
+        client = TelegramClient("token", "1001, 1002")
+        with patch("telegram_client.requests.post") as post:
+            post.return_value.raise_for_status.return_value = None
+            sent = client.send_summary(RunSummary(total=1), "VirusTotal", [])
+        self.assertTrue(sent)
+        self.assertEqual(post.call_count, 2)
+        first_payload = post.call_args_list[0].kwargs["json"]
+        second_payload = post.call_args_list[1].kwargs["json"]
+        self.assertEqual(first_payload["chat_id"], "1001")
+        self.assertEqual(second_payload["chat_id"], "1002")
+
+    def test_telegram_client_accepts_chat_id_list(self) -> None:
+        client = TelegramClient("token", ["1001", " 1002 "])
+        with patch("telegram_client.requests.post") as post:
+            post.return_value.raise_for_status.return_value = None
+            sent = client.send_summary(RunSummary(total=1), "VirusTotal", [])
+        self.assertTrue(sent)
+        self.assertEqual(post.call_count, 2)
+
+    def test_telegram_client_returns_false_on_partial_multi_chat_failure(self) -> None:
+        client = TelegramClient("token", "1001,1002")
+        with patch("telegram_client.requests.post") as post:
+            post.side_effect = [Exception("boom"), post.return_value]
+            post.return_value.raise_for_status.return_value = None
+            sent = client.send_summary(RunSummary(total=1), "VirusTotal", [])
+        self.assertFalse(sent)
+        self.assertEqual(post.call_count, 2)
+
 
 if __name__ == "__main__":
     unittest.main()

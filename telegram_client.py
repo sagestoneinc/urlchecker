@@ -22,32 +22,41 @@ _FLAGGED_DETAILS_MORE_TEMPLATE = "  • …and {count} more flagged URL(s)"
 class TelegramClient:
     """Send messages to a Telegram chat via the Bot API."""
 
-    def __init__(self, bot_token: str, chat_id: str) -> None:
+    def __init__(self, bot_token: str, chat_id: str | list[str]) -> None:
         # Tokens are never logged
         self._token = bot_token
-        self._chat_id = chat_id
+        raw_chat_ids = chat_id if isinstance(chat_id, list) else chat_id.split(",")
+        self._chat_ids = [item.strip() for item in raw_chat_ids if item.strip()]
         self._base = f"{_TELEGRAM_API}/bot{bot_token}"
 
     def _send(self, text: str, parse_mode: str = "HTML") -> bool:
         """Send a message; return True on success."""
-        try:
-            resp = requests.post(
-                f"{self._base}/sendMessage",
-                json={
-                    "chat_id": self._chat_id,
-                    "text": text,
-                    "parse_mode": parse_mode,
-                    "disable_web_page_preview": True,
-                },
-                timeout=15,
-            )
-            resp.raise_for_status()
-            return True
-        except requests.HTTPError as exc:
-            logger.error("Telegram HTTP error: %s", exc)
-        except Exception as exc:
-            logger.error("Telegram send failed: %s", exc)
-        return False
+        if not self._chat_ids:
+            logger.error("Telegram send skipped: no chat IDs configured")
+            return False
+        sent_any = False
+        had_failures = False
+        for chat_id in self._chat_ids:
+            try:
+                resp = requests.post(
+                    f"{self._base}/sendMessage",
+                    json={
+                        "chat_id": chat_id,
+                        "text": text,
+                        "parse_mode": parse_mode,
+                        "disable_web_page_preview": True,
+                    },
+                    timeout=15,
+                )
+                resp.raise_for_status()
+                sent_any = True
+            except requests.HTTPError as exc:
+                had_failures = True
+                logger.error("Telegram HTTP error for chat %s: %s", chat_id, exc)
+            except Exception as exc:
+                had_failures = True
+                logger.error("Telegram send failed for chat %s: %s", chat_id, exc)
+        return sent_any and not had_failures
 
     # ------------------------------------------------------------------
     # Alert messages
