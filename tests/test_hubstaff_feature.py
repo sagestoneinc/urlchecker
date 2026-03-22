@@ -2,7 +2,9 @@ import tempfile
 import unittest
 from datetime import datetime, timezone
 from pathlib import Path
+from unittest.mock import Mock
 
+import requests
 from hubstaff_auth import HubstaffAuth
 from hubstaff_client import HubstaffClient
 from hubstaff_models import HubstaffTask
@@ -304,6 +306,37 @@ class HubstaffFeatureTests(unittest.TestCase):
 
             reloaded = TaskStateStore(Path(tmp) / "state.json")
             self.assertEqual(reloaded.last_update_id(), 42)
+
+    def test_task_bot_run_once_returns_success_on_telegram_conflict(self) -> None:
+        class FakeHandlers:
+            def handle_command(self, telegram_user_id: str, chat_id: str, text: str):
+                from telegram_task_handlers import HandlerResponse
+
+                return HandlerResponse(text="ok")
+
+            def handle_callback_query(self, telegram_user_id: str, chat_id: str, data: str):
+                from telegram_task_handlers import HandlerResponse
+
+                return HandlerResponse(text="ok")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            store = TaskStateStore(Path(tmp) / "state.json")
+            bot = TelegramTaskBot(
+                bot_token="token",
+                handlers=FakeHandlers(),  # type: ignore[arg-type]
+                state_store=store,
+                poll_timeout_seconds=1,
+                poll_interval_seconds=1,
+            )
+
+            response = Mock()
+            response.status_code = 409
+            bot._get_updates = lambda: (_ for _ in ()).throw(  # type: ignore[assignment]
+                requests.HTTPError("Conflict", response=response)
+            )
+
+            exit_code = bot.run_once()
+            self.assertEqual(exit_code, 0)
 
 
 if __name__ == "__main__":
