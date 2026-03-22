@@ -27,7 +27,7 @@ def _build_session(config: Config) -> requests.Session:
     retry = Retry(
         total=config.max_retries,
         backoff_factor=2,
-        status_forcelist=[429, 500, 502, 503, 504],
+        status_forcelist=[500, 502, 503, 504],
         allowed_methods=["GET", "POST"],
         raise_on_status=False,
     )

@@ -5,10 +5,24 @@ from unittest.mock import Mock, patch
 import requests
 
 from config import Config
-from virustotal_client import VirusTotalClient
+from virustotal_client import VirusTotalClient, _build_session
 
 
 class VirusTotalBackupKeyTests(unittest.TestCase):
+    def test_session_retry_does_not_include_429(self) -> None:
+        with patch.dict(
+            os.environ,
+            {
+                "VT_API_KEY": "primary-key",
+            },
+            clear=False,
+        ):
+            config = Config.from_env()
+
+        session = _build_session(config)
+        retry = session.get_adapter("https://").max_retries
+        self.assertNotIn(429, retry.status_forcelist)
+
     def test_uses_backup_key_after_429_response(self) -> None:
         with patch.dict(
             os.environ,
