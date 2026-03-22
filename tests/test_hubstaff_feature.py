@@ -327,6 +327,8 @@ class HubstaffFeatureTests(unittest.TestCase):
 
             exit_code = bot.run_once()
             self.assertEqual(exit_code, 0)
+            bot._delete_webhook.assert_called_once()
+            bot._get_updates.assert_called_once()
 
     def test_task_bot_run_once_recovers_conflict_via_delete_webhook(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
