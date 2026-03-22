@@ -6,9 +6,12 @@ import yaml
 
 class HubstaffWorkflowActivationTests(unittest.TestCase):
     _REPO_ROOT = Path(__file__).resolve().parents[1]
-
-    def test_workflow_file_contains_required_configuration(self) -> None:
-        workflow = (
+        workflow_path = self._REPO_ROOT / ".github/workflows/hubstaff-task-bot.yml"
+        self.assertTrue(
+            workflow_path.is_file(),
+            f"Expected workflow file to exist at {workflow_path!s}",
+        )
+        workflow = workflow_path.read_text(encoding="utf-8")
             self._REPO_ROOT / ".github/workflows/hubstaff-task-bot.yml"
         ).read_text(encoding="utf-8")
         self.assertIn("python bot_entrypoint.py --run-once", workflow)

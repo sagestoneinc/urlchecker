@@ -8,6 +8,9 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: hubstaff-task-bot
+  cancel-in-progress: true
 jobs:
   task-bot:
     runs-on: ubuntu-latest
