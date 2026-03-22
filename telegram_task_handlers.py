@@ -76,8 +76,6 @@ class TelegramTaskHandlers:
     def handle_callback_query(self, *, telegram_user_id: str, chat_id: str, data: str) -> HandlerResponse:
         if data == "cmd:help":
             return self._help_response()
-        if data == "cmd:menu":
-            return self._quick_actions_response()
         if data.startswith("cmd:tasks:"):
             preset = data.split(":", 2)[2]
             return self._handle_list_tasks(telegram_user_id=telegram_user_id, args=preset)
@@ -163,6 +161,14 @@ class TelegramTaskHandlers:
             mapped = self._state.hubstaff_user_id_for(telegram_user_id)
             if mapped:
                 filters["assignee_id"] = mapped
+            else:
+                return HandlerResponse(
+                    text=(
+                        "Can't run 'My tasks' yet because your Telegram account isn't mapped to a Hubstaff user. "
+                        "Set TASKBOT_USER_MAPPING_JSON with your Telegram user id to Hubstaff user id mapping, "
+                        "or run /tasks assignee=<hubstaff_user_id>."
+                    )
+                )
         tasks = self._hubstaff.list_tasks(filters=filters)
         if not tasks:
             return HandlerResponse(text="No tasks found for the selected filters.")

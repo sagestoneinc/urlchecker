@@ -195,6 +195,34 @@ class HubstaffFeatureTests(unittest.TestCase):
             self.assertEqual(reminders[-1].chat_id, "200")
             self.assertEqual(reminders[-1].timezone, "America/New_York")
 
+    def test_handlers_mine_preset_requires_user_mapping(self) -> None:
+        class FakeHubstaff:
+            def list_tasks(self, filters=None, per_page=50):
+                raise AssertionError("list_tasks should not run without mapping for mine preset")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            store = TaskStateStore(Path(tmp) / "state.json")
+            handlers = TelegramTaskHandlers(
+                hubstaff_client=FakeHubstaff(),
+                state_store=store,
+            )
+
+            from_command = handlers.handle_command(
+                telegram_user_id="100",
+                chat_id="200",
+                text="/tasks mine",
+            )
+            self.assertIn("TASKBOT_USER_MAPPING_JSON", from_command.text)
+            self.assertIn("/tasks assignee=<hubstaff_user_id>", from_command.text)
+
+            from_callback = handlers.handle_callback_query(
+                telegram_user_id="100",
+                chat_id="200",
+                data="cmd:tasks:mine",
+            )
+            self.assertIn("TASKBOT_USER_MAPPING_JSON", from_callback.text)
+            self.assertIn("/tasks assignee=<hubstaff_user_id>", from_callback.text)
+
     def test_reminder_engine_sends_due_today(self) -> None:
         class FakeHubstaff:
             def list_tasks(self, filters=None, per_page=50):
