@@ -17,7 +17,9 @@ except ImportError:
     pass  # python-dotenv is listed in requirements.txt; this is a safety guard
 
 from config import Config
+from cloudflare_radar_client import CloudflareRadarURLScannerClient
 from models import RunSummary, ScanResult, Verdict
+from sucuri_sitecheck_client import SucuriSiteCheckClient
 from storage import Storage
 from telegram_client import TelegramClient
 from urlscan_io_client import URLScanIOClient
@@ -115,6 +117,14 @@ def run_scan(
     if config.enable_urlscan_io and config.urlscan_io_api_key:
         urlscan_client = URLScanIOClient(config)
         logger.info("URLScan.io scanner enabled")
+    sucuri_client: Optional[SucuriSiteCheckClient] = None
+    if config.enable_sucuri_sitecheck:
+        sucuri_client = SucuriSiteCheckClient(config)
+        logger.info("Sucuri SiteCheck scanner enabled")
+    cloudflare_client: Optional[CloudflareRadarURLScannerClient] = None
+    if config.enable_cloudflare_radar_url_scanner:
+        cloudflare_client = CloudflareRadarURLScannerClient(config)
+        logger.info("Cloudflare Radar URL scanner enabled")
     telegram: Optional[TelegramClient] = None
     if config.telegram_enabled:
         telegram = TelegramClient(config.telegram_bot_token, config.telegram_chat_id)
@@ -198,6 +208,36 @@ def run_scan(
                 and result.verdict != Verdict.MALICIOUS
             ):
                 result.verdict = Verdict.SUSPICIOUS
+        if sucuri_client:
+            sucuri_result = sucuri_client.scan_url(raw_url)
+            result.sucuri_sitecheck_verdict = sucuri_result.sucuri_sitecheck_verdict
+            result.sucuri_sitecheck_malicious = sucuri_result.sucuri_sitecheck_malicious
+            result.sucuri_sitecheck_suspicious = sucuri_result.sucuri_sitecheck_suspicious
+            result.total_engines += 1
+            result.malicious_count += sucuri_result.sucuri_sitecheck_malicious
+            result.suspicious_count += sucuri_result.sucuri_sitecheck_suspicious
+            if result.sucuri_sitecheck_verdict == Verdict.MALICIOUS:
+                result.verdict = Verdict.MALICIOUS
+            elif (
+                result.sucuri_sitecheck_verdict == Verdict.SUSPICIOUS
+                and result.verdict != Verdict.MALICIOUS
+            ):
+                result.verdict = Verdict.SUSPICIOUS
+        if cloudflare_client:
+            cloudflare_result = cloudflare_client.scan_url(raw_url)
+            result.cloudflare_radar_verdict = cloudflare_result.cloudflare_radar_verdict
+            result.cloudflare_radar_malicious = cloudflare_result.cloudflare_radar_malicious
+            result.cloudflare_radar_suspicious = cloudflare_result.cloudflare_radar_suspicious
+            result.total_engines += 1
+            result.malicious_count += cloudflare_result.cloudflare_radar_malicious
+            result.suspicious_count += cloudflare_result.cloudflare_radar_suspicious
+            if result.cloudflare_radar_verdict == Verdict.MALICIOUS:
+                result.verdict = Verdict.MALICIOUS
+            elif (
+                result.cloudflare_radar_verdict == Verdict.SUSPICIOUS
+                and result.verdict != Verdict.MALICIOUS
+            ):
+                result.verdict = Verdict.SUSPICIOUS
         results.append(result)
 
         if result.verdict in (Verdict.MALICIOUS, Verdict.SUSPICIOUS):
@@ -206,6 +246,10 @@ def run_scan(
                 scanners.append("VirusTotal")
             if result.urlscan_io_verdict in (Verdict.MALICIOUS, Verdict.SUSPICIOUS):
                 scanners.append("URLScan.io")
+            if result.sucuri_sitecheck_verdict in (Verdict.MALICIOUS, Verdict.SUSPICIOUS):
+                scanners.append("Sucuri SiteCheck")
+            if result.cloudflare_radar_verdict in (Verdict.MALICIOUS, Verdict.SUSPICIOUS):
+                scanners.append("Cloudflare Radar URL Scanner")
             flagged_url_details.append((result.normalized_url, ", ".join(scanners)))
 
         # Update summary counters

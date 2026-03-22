@@ -78,6 +78,16 @@ class ScanResult:
     urlscan_io_malicious: int = 0
     urlscan_io_suspicious: int = 0
 
+    # Sucuri SiteCheck analysis details (optional)
+    sucuri_sitecheck_verdict: Optional[Verdict] = None
+    sucuri_sitecheck_malicious: int = 0
+    sucuri_sitecheck_suspicious: int = 0
+
+    # Cloudflare Radar URL Scanner analysis details (optional)
+    cloudflare_radar_verdict: Optional[Verdict] = None
+    cloudflare_radar_malicious: int = 0
+    cloudflare_radar_suspicious: int = 0
+
     # Error info if scan failed
     error: Optional[str] = None
 
@@ -102,6 +112,20 @@ class ScanResult:
             ),
             "urlscan_io_malicious": self.urlscan_io_malicious,
             "urlscan_io_suspicious": self.urlscan_io_suspicious,
+            "sucuri_sitecheck_verdict": (
+                self.sucuri_sitecheck_verdict.value
+                if self.sucuri_sitecheck_verdict
+                else None
+            ),
+            "sucuri_sitecheck_malicious": self.sucuri_sitecheck_malicious,
+            "sucuri_sitecheck_suspicious": self.sucuri_sitecheck_suspicious,
+            "cloudflare_radar_verdict": (
+                self.cloudflare_radar_verdict.value
+                if self.cloudflare_radar_verdict
+                else None
+            ),
+            "cloudflare_radar_malicious": self.cloudflare_radar_malicious,
+            "cloudflare_radar_suspicious": self.cloudflare_radar_suspicious,
             "error": self.error,
             "domain_info": None,
         }
@@ -156,6 +180,20 @@ class ScanResult:
             ),
             urlscan_io_malicious=data.get("urlscan_io_malicious", 0),
             urlscan_io_suspicious=data.get("urlscan_io_suspicious", 0),
+            sucuri_sitecheck_verdict=(
+                Verdict(data["sucuri_sitecheck_verdict"])
+                if data.get("sucuri_sitecheck_verdict")
+                else None
+            ),
+            sucuri_sitecheck_malicious=data.get("sucuri_sitecheck_malicious", 0),
+            sucuri_sitecheck_suspicious=data.get("sucuri_sitecheck_suspicious", 0),
+            cloudflare_radar_verdict=(
+                Verdict(data["cloudflare_radar_verdict"])
+                if data.get("cloudflare_radar_verdict")
+                else None
+            ),
+            cloudflare_radar_malicious=data.get("cloudflare_radar_malicious", 0),
+            cloudflare_radar_suspicious=data.get("cloudflare_radar_suspicious", 0),
             error=data.get("error"),
         )
 

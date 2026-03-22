@@ -105,6 +105,8 @@ Go to **Settings → Secrets and variables → Actions** and add:
 |--------|----------|-------------|
 | `VT_API_KEY` | ✅ | Your VirusTotal API key |
 | `URLSCAN_IO_API_KEY` | Optional | Your URLScan.io API key (used when enabled) |
+| `ENABLE_SUCURI_SITECHECK` | Optional | Enable Sucuri SiteCheck scanner (`true`/`false`) |
+| `ENABLE_CLOUDFLARE_RADAR_URL_SCANNER` | Optional | Enable Cloudflare Radar URL Scanner (`true`/`false`) |
 | `TELEGRAM_BOT_TOKEN` | Optional | Your Telegram bot token (create via [@BotFather](https://t.me/BotFather)) |
 | `TELEGRAM_CHAT_ID` | Optional | The chat / channel ID to send alerts to |
 
@@ -161,6 +163,12 @@ python main.py --run-once
 
 # Enable URLScan.io as a secondary scanner
 ENABLE_URLSCAN_IO=true URLSCAN_IO_API_KEY=your_key python main.py --run-once
+
+# Enable all supported scanners at once
+ENABLE_URLSCAN_IO=true URLSCAN_IO_API_KEY=your_key \
+ENABLE_SUCURI_SITECHECK=true \
+ENABLE_CLOUDFLARE_RADAR_URL_SCANNER=true \
+python main.py --run-once
 
 # Specify a custom URL file
 python main.py --run-once --input my_urls.txt

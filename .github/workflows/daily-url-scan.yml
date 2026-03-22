@@ -71,6 +71,8 @@ jobs:
           SEND_SUMMARY: "true"
           ALERT_ON_CLEAN: "true"
           REPORT_SOURCES_CHECKED: "Browser logs, spam reports, customer tickets"
+          ENABLE_SUCURI_SITECHECK: "true"
+          ENABLE_CLOUDFLARE_RADAR_URL_SCANNER: "true"
           RESULTS_DIR: results
         run: |
           EXTRA_FLAGS=""

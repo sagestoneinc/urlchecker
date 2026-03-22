@@ -61,6 +61,15 @@ class Config:
     urlscan_io_visibility: str = field(
         default_factory=lambda: _optional_env("URLSCAN_IO_VISIBILITY", "unlisted")
     )
+    # Optional additional web scanners
+    enable_sucuri_sitecheck: bool = field(
+        default_factory=lambda: _optional_bool("ENABLE_SUCURI_SITECHECK", "false")
+    )
+    enable_cloudflare_radar_url_scanner: bool = field(
+        default_factory=lambda: _optional_bool(
+            "ENABLE_CLOUDFLARE_RADAR_URL_SCANNER", "false"
+        )
+    )
 
     # Telegram (optional – alerts are skipped when not configured)
     telegram_bot_token: str = field(
