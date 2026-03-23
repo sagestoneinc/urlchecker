@@ -74,12 +74,18 @@ class CloudflareRadarURLScannerClient:
                 result.cloudflare_radar_verdict = Verdict.CLEAN
         except requests.HTTPError as exc:
             status_code = exc.response.status_code if exc.response is not None else "?"
-            logger.error(
-                "Cloudflare Radar HTTP error %s while scanning %s: %s",
-                status_code,
-                norm,
-                exc,
-            )
+            if status_code == 403:
+                logger.debug(
+                    "Cloudflare Radar returned 403 Forbidden while scanning %s",
+                    norm,
+                )
+            else:
+                logger.error(
+                    "Cloudflare Radar HTTP error %s while scanning %s: %s",
+                    status_code,
+                    norm,
+                    exc,
+                )
             result.error = f"Cloudflare Radar HTTP {status_code}: {exc}"
             result.cloudflare_radar_verdict = Verdict.UNKNOWN
         except Exception as exc:
