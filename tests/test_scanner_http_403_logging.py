@@ -21,7 +21,7 @@ class ScannerHttp403LoggingTests(unittest.TestCase):
         ):
             return Config.from_env()
 
-    def test_sucuri_403_logs_debug_not_error_and_returns_unknown(self) -> None:
+    def test_sucuri_403_logs_at_debug_level_and_returns_unknown(self) -> None:
         client = SucuriSiteCheckClient(self._config())
         response = Mock()
         response.status_code = 403
@@ -36,7 +36,7 @@ class ScannerHttp403LoggingTests(unittest.TestCase):
         self.assertEqual(result.sucuri_sitecheck_verdict, Verdict.UNKNOWN)
         self.assertIn("Sucuri HTTP 403", result.error)
 
-    def test_cloudflare_403_logs_debug_not_error_and_returns_unknown(self) -> None:
+    def test_cloudflare_403_logs_at_debug_level_and_returns_unknown(self) -> None:
         client = CloudflareRadarURLScannerClient(self._config())
         response = Mock()
         response.status_code = 403
