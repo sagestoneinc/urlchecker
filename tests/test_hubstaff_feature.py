@@ -467,6 +467,17 @@ class HubstaffFeatureTests(unittest.TestCase):
             self.assertEqual(second_exit_code, 0)
             bot._delete_webhook.assert_called_once()
             self.assertEqual(bot._get_updates.call_count, 2)
+            first_cooldown_until = bot._next_conflict_recovery_at
+            self.assertGreater(first_cooldown_until, 0)
+
+            bot._next_conflict_recovery_at = 0
+            bot._get_updates.side_effect = [
+                requests.HTTPError("Conflict", response=conflict_response),
+            ]
+            third_exit_code = bot.run_once()
+            self.assertEqual(third_exit_code, 0)
+            self.assertEqual(bot._delete_webhook.call_count, 2)
+            self.assertEqual(bot._get_updates.call_count, 3)
 
 
 if __name__ == "__main__":

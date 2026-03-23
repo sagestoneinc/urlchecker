@@ -33,7 +33,7 @@ class TelegramTaskBot:
         self._offset = last_update_id + 1 if last_update_id > 0 else 0
         self._base_url = f"https://api.telegram.org/bot{bot_token}"
         self._next_conflict_recovery_at = 0.0
-        self._conflict_recovery_cooldown_seconds = max(30, self._poll_timeout)
+        self._conflict_recovery_cooldown_seconds = 30
 
     def run_forever(self) -> None:
         logger.info("Starting Hubstaff Telegram task bot (polling mode)")
@@ -163,6 +163,7 @@ class TelegramTaskBot:
             if exc.response is None or exc.response.status_code != 409:
                 raise
             if time.monotonic() < self._next_conflict_recovery_at:
+                logger.debug("Task bot conflict recovery cooldown active; skipping webhook reset fallback.")
                 return None
             return self._recover_updates_after_conflict()
 
