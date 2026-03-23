@@ -172,7 +172,17 @@ class TelegramTaskBot:
             "Task bot getUpdates conflict (409). "
             "Attempting webhook reset fallback."
         )
-        if not self._delete_webhook():
+        try:
+            webhook_deleted = self._delete_webhook()
+        except requests.RequestException as exc:
+            logger.warning(
+                "Task bot fallback failed: webhook reset request failed (%s). "
+                "Another poller may already be running.",
+                exc,
+            )
+            self._activate_conflict_recovery_cooldown()
+            return None
+        if not webhook_deleted:
             logger.warning(
                 "Task bot fallback failed: webhook reset did not succeed. "
                 "Another poller may already be running."
