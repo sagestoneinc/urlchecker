@@ -436,6 +436,38 @@ class HubstaffFeatureTests(unittest.TestCase):
                 any("failed while processing updates" in line for line in captured.output)
             )
 
+    def test_task_bot_conflict_recovery_uses_cooldown_after_failed_fallback(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            store = TaskStateStore(Path(tmp) / "state.json")
+            bot = TelegramTaskBot(
+                bot_token="token",
+                handlers=self.FakeHandlers(),  # type: ignore[arg-type]
+                state_store=store,
+                poll_timeout_seconds=1,
+                poll_interval_seconds=1,
+            )
+
+            conflict_response = Mock()
+            conflict_response.status_code = 409
+            bot._get_updates = Mock(  # type: ignore[assignment]
+                side_effect=[
+                    requests.HTTPError("Conflict", response=conflict_response),
+                    requests.HTTPError("Conflict", response=conflict_response),
+                ]
+            )
+            bot._delete_webhook = Mock(return_value=False)  # type: ignore[assignment]
+            bot._conflict_recovery_cooldown_seconds = 60
+
+            first_exit_code = bot.run_once()
+            self.assertEqual(first_exit_code, 0)
+            bot._delete_webhook.assert_called_once()
+            self.assertEqual(bot._get_updates.call_count, 1)
+
+            second_exit_code = bot.run_once()
+            self.assertEqual(second_exit_code, 0)
+            bot._delete_webhook.assert_called_once()
+            self.assertEqual(bot._get_updates.call_count, 2)
+
 
 if __name__ == "__main__":
     unittest.main()
