@@ -51,6 +51,36 @@ class ScannerHttp403LoggingTests(unittest.TestCase):
         self.assertEqual(result.cloudflare_radar_verdict, Verdict.UNKNOWN)
         self.assertIn("Cloudflare Radar HTTP 403", result.error)
 
+    def test_sucuri_500_logs_error_not_debug_and_returns_unknown(self) -> None:
+        client = SucuriSiteCheckClient(self._config())
+        response = Mock()
+        response.status_code = 500
+        error = requests.HTTPError("500 Server Error", response=response)
+        with patch.object(client, "_get", side_effect=error), patch(
+            "sucuri_sitecheck_client.logger"
+        ) as logger_mock:
+            result = client.scan_url("https://example.com")
+
+        logger_mock.error.assert_called_once()
+        logger_mock.debug.assert_not_called()
+        self.assertEqual(result.sucuri_sitecheck_verdict, Verdict.UNKNOWN)
+        self.assertIn("Sucuri HTTP 500", result.error)
+
+    def test_cloudflare_500_logs_error_not_debug_and_returns_unknown(self) -> None:
+        client = CloudflareRadarURLScannerClient(self._config())
+        response = Mock()
+        response.status_code = 500
+        error = requests.HTTPError("500 Server Error", response=response)
+        with patch.object(client, "_get", side_effect=error), patch(
+            "cloudflare_radar_client.logger"
+        ) as logger_mock:
+            result = client.scan_url("https://example.com")
+
+        logger_mock.error.assert_called_once()
+        logger_mock.debug.assert_not_called()
+        self.assertEqual(result.cloudflare_radar_verdict, Verdict.UNKNOWN)
+        self.assertIn("Cloudflare Radar HTTP 500", result.error)
+
 
 if __name__ == "__main__":
     unittest.main()
