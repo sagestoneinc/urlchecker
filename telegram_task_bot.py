@@ -32,6 +32,8 @@ class TelegramTaskBot:
         last_update_id = self._state.last_update_id()
         self._offset = last_update_id + 1 if last_update_id > 0 else 0
         self._base_url = f"https://api.telegram.org/bot{bot_token}"
+        self._next_conflict_recovery_at = 0.0
+        self._conflict_recovery_cooldown_seconds = 30
 
     def run_forever(self) -> None:
         logger.info("Starting Hubstaff Telegram task bot (polling mode)")
@@ -154,10 +156,15 @@ class TelegramTaskBot:
 
     def _get_updates_with_conflict_recovery(self) -> list[dict[str, Any]] | None:
         try:
-            return self._get_updates()
+            updates = self._get_updates()
+            self._next_conflict_recovery_at = 0.0
+            return updates
         except requests.HTTPError as exc:
             if exc.response is None or exc.response.status_code != 409:
                 raise
+            if time.monotonic() < self._next_conflict_recovery_at:
+                logger.debug("Task bot conflict recovery cooldown active; skipping webhook reset fallback.")
+                return None
             return self._recover_updates_after_conflict()
 
     def _recover_updates_after_conflict(self) -> list[dict[str, Any]] | None:
@@ -165,14 +172,26 @@ class TelegramTaskBot:
             "Task bot getUpdates conflict (409). "
             "Attempting webhook reset fallback."
         )
-        if not self._delete_webhook():
+        try:
+            webhook_deleted = self._delete_webhook()
+        except requests.RequestException as exc:
+            logger.warning(
+                "Task bot fallback failed: webhook reset request failed (%s). "
+                "Another poller may already be running.",
+                exc,
+            )
+            self._activate_conflict_recovery_cooldown()
+            return None
+        if not webhook_deleted:
             logger.warning(
                 "Task bot fallback failed: webhook reset did not succeed. "
                 "Another poller may already be running."
             )
+            self._activate_conflict_recovery_cooldown()
             return None
         try:
             updates = self._get_updates()
+            self._next_conflict_recovery_at = 0.0
             logger.info("Task bot recovered from Telegram conflict via deleteWebhook fallback.")
             return updates
         except requests.HTTPError as exc:
@@ -181,8 +200,14 @@ class TelegramTaskBot:
                     "Task bot getUpdates conflict (409) "
                     "after webhook reset fallback. Another poller may already be running."
                 )
+                self._activate_conflict_recovery_cooldown()
                 return None
             raise
+
+    def _activate_conflict_recovery_cooldown(self) -> None:
+        self._next_conflict_recovery_at = (
+            time.monotonic() + self._conflict_recovery_cooldown_seconds
+        )
 
     def _delete_webhook(self) -> bool:
         response = requests.post(

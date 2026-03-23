@@ -2,7 +2,7 @@ import tempfile
 import unittest
 from datetime import datetime, timezone
 from pathlib import Path
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 import requests
 from hubstaff_auth import HubstaffAuth
@@ -435,6 +435,92 @@ class HubstaffFeatureTests(unittest.TestCase):
             self.assertTrue(
                 any("failed while processing updates" in line for line in captured.output)
             )
+
+    def test_task_bot_conflict_recovery_uses_cooldown_after_failed_fallback(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            store = TaskStateStore(Path(tmp) / "state.json")
+            bot = TelegramTaskBot(
+                bot_token="token",
+                handlers=self.FakeHandlers(),  # type: ignore[arg-type]
+                state_store=store,
+                poll_timeout_seconds=1,
+                poll_interval_seconds=1,
+            )
+
+            conflict_response = Mock()
+            conflict_response.status_code = 409
+            bot._get_updates = Mock(  # type: ignore[assignment]
+                side_effect=[
+                    requests.HTTPError("Conflict", response=conflict_response),
+                    requests.HTTPError("Conflict", response=conflict_response),
+                    requests.HTTPError("Conflict", response=conflict_response),
+                ]
+            )
+            bot._delete_webhook = Mock(return_value=False)  # type: ignore[assignment]
+            bot._conflict_recovery_cooldown_seconds = 60
+
+            with patch(
+                "telegram_task_bot.time.monotonic",
+                side_effect=[100.0, 110.0, 120.0, 200.0, 210.0],
+            ):
+                first_exit_code = bot.run_once()
+                self.assertEqual(first_exit_code, 0)
+                bot._delete_webhook.assert_called_once()
+                self.assertEqual(bot._get_updates.call_count, 1)
+
+                second_exit_code = bot.run_once()
+                self.assertEqual(second_exit_code, 0)
+                bot._delete_webhook.assert_called_once()
+                self.assertEqual(bot._get_updates.call_count, 2)
+
+                third_exit_code = bot.run_once()
+                self.assertEqual(third_exit_code, 0)
+                self.assertEqual(bot._delete_webhook.call_count, 2)
+                self.assertEqual(bot._get_updates.call_count, 3)
+
+    def test_task_bot_conflict_recovery_uses_cooldown_when_delete_webhook_raises(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            store = TaskStateStore(Path(tmp) / "state.json")
+            bot = TelegramTaskBot(
+                bot_token="token",
+                handlers=self.FakeHandlers(),  # type: ignore[arg-type]
+                state_store=store,
+                poll_timeout_seconds=1,
+                poll_interval_seconds=1,
+            )
+
+            conflict_response = Mock()
+            conflict_response.status_code = 409
+            bot._get_updates = Mock(  # type: ignore[assignment]
+                side_effect=[
+                    requests.HTTPError("Conflict", response=conflict_response),
+                    requests.HTTPError("Conflict", response=conflict_response),
+                    requests.HTTPError("Conflict", response=conflict_response),
+                ]
+            )
+            bot._delete_webhook = Mock(  # type: ignore[assignment]
+                side_effect=requests.HTTPError("deleteWebhook failed")
+            )
+            bot._conflict_recovery_cooldown_seconds = 60
+
+            with patch(
+                "telegram_task_bot.time.monotonic",
+                side_effect=[100.0, 110.0, 120.0, 200.0, 210.0],
+            ):
+                first_exit_code = bot.run_once()
+                self.assertEqual(first_exit_code, 0)
+                bot._delete_webhook.assert_called_once()
+                self.assertEqual(bot._get_updates.call_count, 1)
+
+                second_exit_code = bot.run_once()
+                self.assertEqual(second_exit_code, 0)
+                bot._delete_webhook.assert_called_once()
+                self.assertEqual(bot._get_updates.call_count, 2)
+
+                third_exit_code = bot.run_once()
+                self.assertEqual(third_exit_code, 0)
+                self.assertEqual(bot._delete_webhook.call_count, 2)
+                self.assertEqual(bot._get_updates.call_count, 3)
 
 
 if __name__ == "__main__":
