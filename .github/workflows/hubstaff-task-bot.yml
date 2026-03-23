@@ -35,5 +35,5 @@ jobs:
         if: ${{ env.HUBSTAFF_TOKEN != '' && env.TELEGRAM_BOT_TOKEN != '' }}
         env:
           ENABLE_HUBSTAFF_TASKS_BOT: "true"
-          TASKBOT_USER_MAPPING_JSON: ${{ secrets.TASKBOT_USER_MAPPING_JSON }}
+          TASKBOT_USER_MAPPING_JSON: "{}"
         run: python bot_entrypoint.py --run-once
